@@ -1,0 +1,30 @@
+# Core dependencies
+pandas==2.1.4
+numpy==1.26.2
+python-dotenv==1.0.0
+
+# Data sources
+yfinance==0.2.33
+alpha-vantage==2.3.1
+
+# Database
+sqlalchemy==2.0.23
+
+# TradingAgents
+# (Clone from GitHub separately)
+
+# API/LLM
+openai==1.6.1
+
+# Utilities
+schedule==1.2.0
+requests==2.31.0
+
+# Visualization (for future dashboard)
+streamlit==1.29.0
+plotly==5.18.0
+matplotlib==3.8.2
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
