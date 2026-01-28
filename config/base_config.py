@@ -19,3 +19,17 @@ class BaseConfig:
    
    LOG_LEVEL = 'DEBUG' if DEBUG else 'INFO'
    LOG_FILE = os.path.join(PROJECT_ROOT, 'system.log')
+
+   @classmethod
+   def validate(cls):
+       missing = []
+
+       if not cls.OPENAI_API_KEY:
+           missing.append('OPENAI_API_KEY')
+
+       if not cls.ALPHA_VANTAGE_API_KEY:
+           missing.append('ALPHA_VANTAGE_API_KEY')
+
+       if missing:
+           raise ValueError(f"Missing required environment variables: {','.join(missing)}")
+       return True
