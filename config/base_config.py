@@ -16,4 +16,6 @@ class BaseConfig:
    DATA_DIR = os.path.join(PROJECT_ROOT, 'data')
    RAW_DATA_DIR = os.path.join(DATA_DIR, 'raw')
    PROCESSED_DATA_DIR = os.path.join(DATA_DIR, 'processed')
-
+   
+   LOG_LEVEL = 'DEBUG' if DEBUG else 'INFO'
+   LOG_FILE = os.path.join(PROJECT_ROOT, 'system.log')
