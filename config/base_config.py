@@ -19,6 +19,18 @@ class BaseConfig:
    
    LOG_LEVEL = 'DEBUG' if DEBUG else 'INFO'
    LOG_FILE = os.path.join(PROJECT_ROOT, 'system.log')
+   #if DEBUG = True
+        # "include everything INFO WARNING ERROR CRITICAL
+        # and Detailed internal info"
+    #else
+        #"include just INFO WARNING ERROR CRITICAL"
+   #Development
+   #DEBUG = True "include everything  Detailed internal info"
+   #LOG_LEVEL = "DEBUG"
+
+   #Production
+   #DEBUT = False
+   #LOG_LEVEL = "INFO"
 
    @classmethod
    def validate(cls):
