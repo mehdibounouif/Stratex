@@ -11,4 +11,3 @@ class DataConfig:
     ALPHA_VANTAGE_CALLS_PER_DAY = 25
     # Data quality
     MAX_MISSING_DATA = 0.05
-
