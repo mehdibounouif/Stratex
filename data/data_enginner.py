@@ -8,7 +8,7 @@ from config import BaseConfig, DataConfig
 class DataEngineer:
     def __init__(self):
         self.config = DataConfig()
-        print("Using text DataEngineer (Abdo placeholder)")
+        print("Using text DataEngineer (ABDILAH placeholder)")
 
     def get_price_history(self, ticker, days=365):
         """
@@ -38,7 +38,11 @@ class DataEngineer:
             print(f"Error fetching {ticker}: {e}")
             return (None)
 
-
+    def get_latest_price(self, ticker):
+        data = self.get_price_history(ticker, days=5)
+        if data is not None and not data.empty:
+            return data['Close'].iloc[-1]
+        return (None)
 
 
 
