@@ -50,7 +50,12 @@ class DataEngineer:
             results[ticker] = self.get_price_history(ticker, days)
         return (results)
 
+data_access = DataEnginner()
 
+if __name__ = "__main__":
+    print("Testing Data Enginner...")
+    data = data_access.get_price_history('AAPL', days=30)
+    print(f"\nSample data:\n {data.head()}")
 
 
 
