@@ -1,6 +1,6 @@
 import pandas as pd
 import yfinance as yf
-from datetime import datatime, timedelta
+from datetime import datetime, timedelta
 import os
 from config import BaseConfig, DataConfig
 
@@ -21,20 +21,20 @@ class DataEngineer:
         print(f"Fetching {ticker} data (last {days} days)...")
         try:
             end_date = datetime.now()
-            start_data = end_date = timedelta(days=days)
+            start_date = end_date - timedelta(days=days)
             data = yf.download(
                     ticker,
                     start= start_date.strftime('%Y-%m-%d'),
                     end= end_date.strftime('%Y-%m-%d'),
                     progress=False
             )
-            if data.empy:
+            if data.empty:
                 print(f"NO data found for {ticker}")
                 return (None)
             print(f"Retrieved {len(data)} records for {ticker}")
             return (data)
 
-        except Exeption as e:
+        except Exception as e:
             print(f"Error fetching {ticker}: {e}")
             return (None)
 
@@ -50,9 +50,9 @@ class DataEngineer:
             results[ticker] = self.get_price_history(ticker, days)
         return (results)
 
-data_access = DataEnginner()
+data_access = DataEngineer()
 
-if __name__ = "__main__":
+if __name__ == "__main__":
     print("Testing Data Enginner...")
     data = data_access.get_price_history('AAPL', days=30)
     print(f"\nSample data:\n {data.head()}")
