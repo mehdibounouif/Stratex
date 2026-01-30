@@ -30,25 +30,25 @@ class DataEngineer:
             )
             if data.empty:
                 print(f"NO data found for {ticker}")
-                return (None)
+                return None
             print(f"Retrieved {len(data)} records for {ticker}")
-            return (data)
+            return data
 
         except Exception as e:
             print(f"Error fetching {ticker}: {e}")
-            return (None)
+            return None
 
     def get_latest_price(self, ticker):
         data = self.get_price_history(ticker, days=5)
         if data is not None and not data.empty:
             return data['Close'].iloc[-1]
-        return (None)
+        return None
 
     def get_muliple_stocks(self, tickers, days=365):
         results = {}
         for ticker in tickers:
             results[ticker] = self.get_price_history(ticker, days)
-        return (results)
+        return results
 
 data_access = DataEngineer()
 
