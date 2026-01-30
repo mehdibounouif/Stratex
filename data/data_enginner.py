@@ -44,7 +44,11 @@ class DataEngineer:
             return data['Close'].iloc[-1]
         return (None)
 
-
+    def get_muliple_stocks(self, tickers, days=365):
+        results = {}
+        for ticker in tickers:
+            results[ticker] = self.get_price_history(ticker, days)
+        return (results)
 
 
 
