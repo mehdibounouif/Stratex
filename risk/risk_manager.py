@@ -13,4 +13,9 @@ class RiskManager:
         if size > self.config.MAX_POSITION_SIZE:
             return False, f"Position size {size:.1%} exceeds max {self.config.MAX_POSITION_SIZE} "
         return True, "Position size Ok"
-    
+    def check_cash_reserve(self, trade_value):
+        cash_after_trade = self.current_cach - trade_value
+        cash_pct = cash_after_trade / self.current_portfolio_value
+        if cash_pct < self.config.MIN_CASH_RESERVE:
+            return False, f"insuffcient cash reserve would have {cash_pct:.1%}"
+        return True, "cash reserve Ok"
