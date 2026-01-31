@@ -1,0 +1,93 @@
+===============================================================
+DRAWDOWN = how much you have lost from your highest point so far
+
+Not from where you started.
+Not from yesterday.
+From the peak.
+
+| Day    | Portfolio Value      |
+| ------ | -------------------- |
+| Day 1  | $100,000             |
+| Day 5  | $112,000 ← **PEAK**  |
+| Day 8  | $108,000             |
+| Day 12 | $100,000             |
+| Day 15 | $95,000 ← **TROUGH** |
+
+Drawdown = (Peak - Current) / Peak
+Drawdown = (112,000 - 95,000) / 112,000
+Drawdown = 17,000 / 112,000 ≈ 15.18%
+
+Why 15% Specifically?
+15% is common because:
+| Drawdown | Gain Needed to Recover |
+| -------- | ---------------------- |
+| 10%      | +11.1%                 |
+| **15%**  | **+17.6%**             |
+| 20%      | +25%                   |
+| 30%      | +42.9%                 |
+| 50%      | +100%                  |
+
+Losses compound faster than gains.
+
+Gain Needed to recover mean:
+Drawdrown = 15% => 0.15
+Gain = 0.15 / (1 - 0.15)
+Gain = 0.15 / 0.85
+Gain ≈ 0.176
+convert to %:
+0.176 * 100 = 17.6%
+===============================================================
+===============================================================
+
+Correlation measures how two assets move together based on their returns (not prices).
+
+calculate Pearson correlation:
+- Step 1: Get price data:
+Assume two stocks: A and B:
+| Day | Price A | Price B |
+| --- | ------- | ------- |
+| 1   | 100     | 50      |
+| 2   | 102     | 51      |
+| 3   | 101     | 50      |
+| 4   | 103     | 52      |
+| 5   | 104     | 54      |
+- Step 2: Convert prices → returns:
+| Day | Return A                    | Return B                 |
+| --- | --------------------------- | ------------------------ |
+| 2   | (102−100)/100 = **0.020**   | (51−50)/50 = **0.020**   |
+| 3   | (101−102)/102 = **-0.0098** | (50−51)/51 = **-0.0196** |
+| 4   | (103−101)/101 = **0.0198**  | (52−50)/50 = **0.040**   |
+| 5   | (104−103)/103 = **0.0097**  | (54−52)/52 = **0.0385**  |
+
+- Step 3: Find the mean return of each asset:
+sum retrns / total returns
+Mean A ≈ 0.0099
+Mean B ≈ 0.0197
+
+- Step 4: Subtract the mean (deviation):
+Deviation = Today’s return − Average return
+| Day | Return A | Mean A | A Deviation | Return B | Mean B | B Deviation |
+| --- | -------- | ------ | ----------- | -------- | ------ | ----------- |
+| 1   | 0.0200   | 0.0099 | **+0.0101** | 0.0200   | 0.0197 | **+0.0003** |
+| 2   | -0.0098  | 0.0099 | **-0.0197** | -0.0196  | 0.0197 | **-0.0393** |
+| 3   | 0.0198   | 0.0099 | **+0.0099** | 0.0400   | 0.0197 | **+0.0203** |
+| 4   | 0.0097   | 0.0099 | **-0.0002** | 0.0385   | 0.0197 | **+0.0188** |
+This centers both assets around zero, which is required for correlation.
+
+- Step 5: Covariance (Do they move together?):
+Multiply the deviations row by row.
+| Day | A Deviation | B Deviation | Product       |
+| --- | ----------- | ----------- | ------------- |
+| 1   | +0.0101     | +0.0003     | **+0.000003** |
+| 2   | -0.0197     | -0.0393     | **+0.000774** |
+| 3   | +0.0099     | +0.0203     | **+0.000201** |
+| 4   | -0.0002     | +0.0188     | **-0.000004** |
+
+Why signs matter
+(+ × +) → positive → move together
+(− × −) → positive → move together
+(+ × −) → negative → move opposite
+
+Covariance Formula (applied):
+Covariance = Sum of products / (n − 1).
+Cov(A, B) ≈ (0.000974) / 3 ≈ 0.000325
