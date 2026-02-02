@@ -1,0 +1,101 @@
+======================================================
+RSI really measures (intuition first)
+RSI answers one question:
+“Have prices gone up too fast or down too fast recently?”
+
+Too much down → oversold → possible bounce
+Too much up → overbought → possible drop
+
+RSI range:
+0 ───────── 100
+
+- Step 0: Closing prices (real numbers)
+| Day | Close |
+| --: | ----: |
+|   1 |   100 |
+|   2 |   102 |
+|   3 |   101 |
+|   4 |   103 |
+|   5 |   104 |
+|   6 |   103 |
+|   7 |   105 |
+|   8 |   106 |
+|   9 |   104 |
+|  10 |   103 |
+|  11 |   102 |
+|  12 |   101 |
+|  13 |   100 |
+|  14 |    99 |
+|  15 |    98 |
+We need 14 periods, so RSI is calculated on Day 15.
+
+- Step 1: Price changes (Δ):
+Δ = Close today​ − Close yesterday​
+| Day | Close |  Δ |
+| --: | ----: | -: |
+|   2 |   102 | +2 |
+|   3 |   101 | -1 |
+|   4 |   103 | +2 |
+|   5 |   104 | +1 |
+|   6 |   103 | -1 |
+|   7 |   105 | +2 |
+|   8 |   106 | +1 |
+|   9 |   104 | -2 |
+|  10 |   103 | -1 |
+|  11 |   102 | -1 |
+|  12 |   101 | -1 |
+|  13 |   100 | -1 |
+|  14 |    99 | -1 |
+|  15 |    98 | -1 |
+
+- Step 2: Separate Gains and Losses:
+
+Gains = positive Δ, else 0
+Losses = absolute value of negative Δ, else 0
+| Day |  Δ | Gain | Loss |
+| --: | -: | ---: | ---: |
+|   2 | +2 |    2 |    0 |
+|   3 | -1 |    0 |    1 |
+|   4 | +2 |    2 |    0 |
+|   5 | +1 |    1 |    0 |
+|   6 | -1 |    0 |    1 |
+|   7 | +2 |    2 |    0 |
+|   8 | +1 |    1 |    0 |
+|   9 | -2 |    0 |    2 |
+|  10 | -1 |    0 |    1 |
+|  11 | -1 |    0 |    1 |
+|  12 | -1 |    0 |    1 |
+|  13 | -1 |    0 |    1 |
+|  14 | -1 |    0 |    1 |
+|  15 | -1 |    0 |    1 |
+
+- Step 3: Average Gain & Average Loss (14 periods):
+Average Gain = (2+2+1+2+1​) / 14 = 0.571
+Average Loss = (1+1+2+1+1+1+1+1+1) / 14 = 0.714
+
+- Step 4: Relative Strength (RS):
+RS = Avg Gain / Avg Loss
+RS = 0.571 / 0.714 = 0.80
+
+- Step 5: RSI formula (final step):
+RSI = 100 - 100 / (1 + RS)
+
+RSI = 100 - 100 / (1.80) = (100 - 55.56) = 44.44
+
+- Final RSI result:
+| Metric       | Value     |
+| ------------ | --------- |
+| Average Gain | 0.571     |
+| Average Loss | 0.714     |
+| RS           | 0.80      |
+| **RSI**      | **44.44** |
+
+- How to interpret RSI = 44.44:
+
+| RSI   | Meaning    | Action |
+| ----- | ---------- | ------ |
+| < 30  | Oversold   | BUY    |
+| 30–70 | Neutral    | HOLD   |
+| > 70  | Overbought | SELL   |
+
+44.44 → HOLD

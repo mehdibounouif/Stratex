@@ -10,8 +10,6 @@ alpha-vantage==2.3.1
 # Database
 sqlalchemy==2.0.23
 
-# TradingAgents
-# (Clone from GitHub separately)
 
 # API/LLM
 openai==1.6.1
