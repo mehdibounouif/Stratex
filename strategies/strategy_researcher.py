@@ -50,3 +50,11 @@ class StrategyResearcher:
     def analyze(self, ticker, price_data):
         return self.simple_rsi_strategy(ticker, price_data)
 
+strategy_engine = StrategyResearcher()
+
+if __name__ == "__main__":
+    from data.data_enginner import data_access
+    print("Testing Stratgy...")
+    data = data_access.get_price_history('AAPL', days=90)
+    signal = strategy_engine.analyze('AAPL', data)
+    print(f"\n Signal: {signal}")
