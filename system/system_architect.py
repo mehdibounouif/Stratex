@@ -114,14 +114,15 @@ class TradingSystem:
         if buy_signals:
             print("\n APPROVED BUY OPPORTUNITIES:")
             for signal in buy_signals:
-                print(f" - {signal['ticker']}: {signal['quantity']} shares @ ${signal['price']:.2f}\n")
+                print(f" - {signal['ticker']}: {signal['quantity']} shares ${signal['price']:.2f}\n")
         return results
     
+    def run_daily_analysis(self):
+        print(f"#{'DAILY TRADING ANALYSIS':^68}#")
+        print(f"#{'Date: ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S'):^68}#")
+
+        results = self.scan_watchlist()
+        return results
+
+trading_system = TradingSystem()
   
-        
-
-
-system = TradingSystem()
-
-#if __name__ == "__main__":
-    
