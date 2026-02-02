@@ -5,7 +5,7 @@ class TradingConfig:
 
     # Defualt Stock Watchlist
     DEFAULT_WATCHLIST = [
-            'AAPL', 'MSFT', 'NVDA', 'GOOGL', 'META'
+            'AAPL', 'MSFT', 'NVDA', 'GOOGL', 'META',
             'TSLA', 'AMZN', 'AMD', 'NFLX']
 
     # Trading hours
