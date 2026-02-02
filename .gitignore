@@ -9,6 +9,10 @@ __pycache__/
 *.so
 .Python
 
+# my_files
+notes_for_me
+team_tasks
+
 # Database
 *.db
 *.sqlite3

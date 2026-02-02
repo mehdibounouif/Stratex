@@ -8,16 +8,10 @@ from config import BaseConfig, DataConfig
 class DataEngineer:
     def __init__(self):
         self.config = DataConfig()
-        print("Using text DataEngineer (ABDILAH placeholder)")
+        print("Using test DataEngineer (ABDILAH placeholder)")
 
     def get_price_history(self, ticker, days=365):
-        """
-        TODO FOR ABDILAH:
-        - Add database storage
-        - Add data quality checkes
-        - Add caching
-        - Handle API rate limits
-        """
+        
         print(f"Fetching {ticker} data (last {days} days)...")
         try:
             end_date = datetime.now()
