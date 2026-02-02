@@ -5,7 +5,7 @@ class RiskManager:
         self.config = RiskConfig()
         self.current_portfolio_value = 1000
         self.current_cach = 200
-        self.num_positions = 0
+        self.num_positions = 20
         print("Using test risk manager (Message for B3aybach)")
 
     def check_position_size(self, size):
@@ -20,7 +20,7 @@ class RiskManager:
             return False, f"insuffcient cash reserve would have {cash_pct:.1%}"
         return True, "cash reserve Ok"
     def approve_trade(self, trade):
-        print(f"\n Reviewing trade: {trade['ticker']}")
+        print(f"\nReviewing trade: {trade['ticker']}")
         checks = {}
         if trade['action'] == 'BUY':
             trade_value = trade.get('quantity', 0) * trade.get('currect_price', 0)
@@ -37,7 +37,7 @@ class RiskManager:
             print(f"{msg}")
 
             """check max position"""
-            if self.num_positions >= self.config.MAX_TOTAL_POSITION:
+            if self.num_positions >= self.config.MAX_TOTAL_POSITIONS:
                 checks['max_position'] = False
                 print(f"{self.num_positions} is too much, Max positions is: {self.config.MAX_TOTAL_POSITIONS}")
             else:

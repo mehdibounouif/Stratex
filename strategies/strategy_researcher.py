@@ -28,6 +28,8 @@ class StrategyResearcher:
         current_rsi = float(rsi.iloc[-1])
         current_price = float(close.iloc[-1])
 
+        if not 0 <= current_rsi <= 100:
+            raise ValueError(f"Invalid RSI value: {current_rsi}")
         if current_rsi < 30:
             signal = 'BUY'
             confidence = 0.65
