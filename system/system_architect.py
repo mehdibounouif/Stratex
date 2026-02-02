@@ -18,7 +18,7 @@ class TradingSystem:
         print(f"Debug Mode: {BaseConfig.DEBUG}")
         print(f"Watchlist: {len(self.config.DEFAULT_WATCHLIST)} stocks\n")
 
-    def analyze_signal_stock(self, ticker, data=None):
+    def analyze_single_stock(self, ticker, data=None):
         if data is None:
             data = datetime.now().strftime("%Y-%m-%d")
 
@@ -97,7 +97,7 @@ class TradingSystem:
         
         for ticker in self.config.DEFAULT_WATCHLIST:
             try:
-                decision = self.analyze_signal_stock(ticker)
+                decision = self.analyze_single_stock(ticker)
                 if decision:
                     results.append(decision)
             except Exception as e:
@@ -125,4 +125,17 @@ class TradingSystem:
         return results
 
 trading_system = TradingSystem()
-  
+
+if __name__ == "__main__":
+    print("Testing Trading System...\n")
+    
+    # Test 1: Analyze single stock
+    print("TEST 1: Single Stock Analysis\n")
+    result = trading_system.analyze_single_stock('AAPL')
+    print(f"\nResult: {result}\n")
+    
+    # Test 2: Scan first 3 stocks from watchlist (to save time)
+    print("TEST 2: Watchlist Scan (first 3 stocks)\n")
+    trading_system.config.DEFAULT_WATCHLIST = ['AAPL', 'MSFT', 'NVDA']  # Just 3 for testing
+    results = trading_system.scan_watchlist()
+    
