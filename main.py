@@ -2,12 +2,7 @@ import sys
 from system.system_architect import trading_system
 
 def main():
-    print("""
-    ------------------------------------------------------------
-    |          QUANTITATIVE TRADING SYSTEM v1.0                |
-    ------------------------------------------------------------
-    """)
-    
+   
     print("\nSelect operation:")
     print("1. Analyze single stock")
     print("2. Scan entire watchlist")
