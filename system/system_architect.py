@@ -91,6 +91,35 @@ class TradingSystem:
                 'status': 'NO_ACTION',
                 'signal': signal
             }
+    def scan_watchlist(self):
+        print(f"\nSCANNING WATCHLIST ({len(self.config.DEFAULT_WATCHLIST)}) Stocks.")
+        results = []
+        
+        for ticker in self.config.DEFAULT_WATCHLIST:
+            try:
+                decision = self.analyze_signal_stock(ticker)
+                if decision:
+                    results.append(decision)
+            except Exception as e:
+                print(f"Error analysing {ticker}: {e}")
+                continue
+        buy_signals = [r for r in results if r['action'] == 'BUY' and r['status'] == 'APPROVED']
+        hold_signals = [r for r in results if r['action'] == 'HOLD']
+
+        print("\nSCAN SUMMARY:")
+        print(f"Total analyzed: {len(results)}")
+        print(f"BUY signals (approved): {len(buy_signals)}")
+        print(f"HOLD signals: {len(hold_signals)}")
+
+        if buy_signals:
+            print("\n APPROVED BUY OPPORTUNITIES:")
+            for signal in buy_signals:
+                print(f" - {signal['ticker']}: {signal['quantity']} shares @ ${signal['price']:.2f}\n")
+        return results
+    
+  
+        
+
 
 system = TradingSystem()
 

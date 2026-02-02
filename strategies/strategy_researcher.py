@@ -62,7 +62,5 @@ if __name__ == "__main__":
     from data.data_enginner import data_access
     print("Testing Stratgy...")
     data = data_access.get_price_history('AAPL', days=90)
-    if data is None:
-        exit()
     signal = strategy_engine.analyze('AAPL', data)
     print(f"\n Signal: {signal}")
