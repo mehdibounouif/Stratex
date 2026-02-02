@@ -17,3 +17,36 @@ class StrategyResearcher:
         rsi = 100 - (100 / (1 + rs))
         return (rsi)
     
+    def rsi_strategy(self, ticker, price_data):
+        if price_data is None or price_data.empty:
+            return (None)
+        rsi = self.calculate_rsi(price_data['Close'])
+        current_rsi = rsi.iloc[-1]
+        current_price = price_data['Close'].iloc[-1]
+
+        if current_rsi < 30:
+            signal = 'BUY'
+            confidence = 0.65
+            reasoning = f"RSI at {current_rsi:.1f} indicates oversold condition"
+        elif current_rsi > 70:
+            signal = 'SELL'
+            confidence = 0.65
+            reasoning = f"RSI at {current_rsi:.1f} indicates overbought condition"
+        else:
+            signal = 'HOLD'
+            confidence = 0.40
+            reasoning = f"RSI at {current_rsi:.1f} in neutral zone"
+        
+        return {
+            'ticker': ticker,
+            'action': signal,
+            'confidence': confidence,
+            'current_price': current_price,
+            'rsi': current_rsi,
+            'reasoning': reasoning,
+            'source': 'RSI Strategy'
+        }
+    
+    def analyze(self, ticker, price_data):
+        return self.simple_rsi_strategy(ticker, price_data)
+
