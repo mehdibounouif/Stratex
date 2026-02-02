@@ -1,0 +1,1202 @@
+==================================================================
+## 1. Arbitrage
+**Definition**: Purchasing an asset from one market and selling it to another market where the price is higher, resulting in profit.
+
+**Example**: You notice gold is selling for $2,000/ounce in New York but $2,015/ounce in London. You buy 100 ounces in New York ($200,000) and simultaneously sell them in London ($201,500), making a $1,500 profit (minus transaction fees). This is risk-free profit from price differences between markets.
+
+---
+
+==================================================================
+## 2. Ask
+**Definition**: The selling price that a trader offers for their shares.
+
+**Example**: You own Tesla stock and want to sell it. You set your ask price at $245 per share. This is the minimum price you're willing to accept. If a buyer agrees to pay $245, the trade executes.
+
+---
+
+==================================================================
+## 3. Asset Allocation
+**Definition**: An investment strategy that balances risk and reward by dividing investments across different asset types.
+
+**Example**: You have $100,000 to invest. You allocate:
+- $60,000 (60%) in stocks for growth
+- $30,000 (30%) in bonds for stability
+- $5,000 (5%) in real estate funds
+- $5,000 (5%) in cash for emergencies
+
+This mix balances potential returns with safety based on your age, goals, and risk tolerance.
+
+---
+
+==================================================================
+## 4. Asset Classes
+**Definition**: Categories of assets, such as stocks, bonds, real estate, or cash.
+
+**Example**: 
+- **Stocks**: Ownership shares in Apple, Amazon, etc.
+- **Bonds**: Loans to governments or corporations
+- **Real Estate**: Physical property or REITs
+- **Cash**: Money in savings accounts
+- **Commodities**: Gold, oil, wheat
+- **Cryptocurrencies**: Bitcoin, Ethereum
+
+Each class has different risk/reward profiles.
+
+---
+
+==================================================================
+## 5. Averaging Down
+**Definition**: Buying additional shares after the price has fallen, resulting in a lower average purchase price.
+
+**Example**: 
+- Week 1: You buy 10 shares of Netflix at $500 = $5,000 invested
+- Week 4: Netflix drops to $400. You buy 10 more shares = $4,000 invested
+- Total: 20 shares for $9,000 = average price of $450/share
+
+Now Netflix only needs to reach $450 (not $500) for you to break even. **Risk**: If it continues falling to $300, you've increased your losses.
+
+---
+
+==================================================================
+## 6. Bear Market
+**Definition**: A market condition where prices are expected to fall, typically 20% or more from recent highs.
+
+**Example**: In 2022, the S&P 500 peaked at about 4,800 in January. By October, it had fallen to around 3,600—a 25% decline. This bear market was driven by inflation fears and rising interest rates. Investors were pessimistic and selling stocks.
+
+---
+
+==================================================================
+## 7. Beta
+**Definition**: The measure of an asset's volatility in relation to the market.
+
+**Example**: 
+- **Beta = 1.0**: Stock moves exactly with the market. If S&P 500 rises 10%, so does the stock.
+- **Beta = 1.5**: Tesla has historically had high beta. If the market rises 10%, Tesla might rise 15%. If the market falls 10%, Tesla might fall 15%.
+- **Beta = 0.5**: A utility company like Duke Energy. If the market rises 10%, it might only rise 5%—more stable but less growth potential.
+- **Beta = -0.5**: Gold stocks sometimes move opposite to the market, rising when stocks fall.
+
+---
+
+==================================================================
+## 8. Bid
+**Definition**: The price a trader is willing to pay for shares of a stock.
+
+**Example**: You want to buy Microsoft stock. You place a bid at $380 per share—this is the maximum you're willing to pay. If a seller accepts your bid, the trade happens at $380.
+
+---
+
+==================================================================
+## 9. Bid-Ask Spread
+**Definition**: The difference between what buyers will pay (bid) and what sellers are asking.
+
+**Example**: 
+- **Apple stock**: Bid = $180.00, Ask = $180.05, Spread = $0.05 (very liquid)
+- **Small company stock**: Bid = $12.50, Ask = $13.00, Spread = $0.50 (less liquid)
+
+A tight spread means the stock is easy to trade. A wide spread means fewer buyers/sellers and higher trading costs.
+
+---
+
+==================================================================
+## 10. Blockchain
+**Definition**: A record-keeping database where cryptocurrency transactions are recorded across multiple computers.
+
+**Example**: When you buy Bitcoin, that transaction is recorded on a "block." This block is linked to previous blocks, forming a "chain." The entire blockchain is stored on thousands of computers worldwide. No single entity controls it—if someone tries to change one record, all other computers reject it. This makes Bitcoin transactions transparent and tamper-proof.
+
+---
+
+==================================================================
+## 11. Blue-Chip Stocks
+**Definition**: Common stocks of well-known, established companies with quality and growth history.
+
+**Example**: 
+- **Coca-Cola**: 130+ year history, pays dividends, globally recognized
+- **Johnson & Johnson**: Stable healthcare giant, survived multiple recessions
+- **Procter & Gamble**: Consumer goods leader (Tide, Pampers, Gillette)
+
+These companies are considered safer investments than startups, though they grow more slowly.
+
+---
+
+==================================================================
+## 12. Bond
+**Definition**: A type of security; essentially a loan from an investor to a borrower (company or government).
+
+**Example**: You buy a $10,000 U.S. Treasury bond with a 5% interest rate and 10-year maturity. The government pays you $500 per year in interest. After 10 years, you get your $10,000 back. Bonds are generally safer than stocks but offer lower returns.
+
+---
+
+==================================================================
+## 13. Bull Market
+**Definition**: A market condition where prices are expected to rise.
+
+**Example**: From March 2009 to February 2020, the stock market experienced an 11-year bull run. The S&P 500 rose from about 800 to over 3,300—more than quadrupling. Investors were optimistic, unemployment was low, and companies were profitable.
+
+---
+
+==================================================================
+## 14. Buyback
+**Definition**: When a company repurchases its own shares from the market, reducing shares outstanding.
+
+**Example**: Apple announces it will buy back $90 billion worth of its own stock. They had 16 billion shares outstanding. After the buyback, they might have 15.5 billion shares. 
+
+**Impact**: Each remaining share represents a larger piece of the company. If Apple earns $100 billion annually:
+- Before: $100B ÷ 16B shares = $6.25 earnings per share
+- After: $100B ÷ 15.5B shares = $6.45 earnings per share
+
+Shareholders benefit from increased value per share.
+
+---
+
+==================================================================
+## 15. Capitalization (Market Cap)
+**Definition**: The total market value of all a company's outstanding shares.
+
+**Example**: 
+- **Microsoft**: 7.5 billion shares × $380/share = $2.85 trillion market cap (mega-cap)
+- **Mid-size company**: 100 million shares × $50/share = $5 billion market cap (mid-cap)
+- **Small company**: 20 million shares × $15/share = $300 million market cap (small-cap)
+
+Market cap determines company size and often correlates with risk and growth potential.
+
+---
+
+==================================================================
+## 16. Capital Gains
+**Definition**: The profit earned after selling an asset for more than you paid.
+
+**Example**: 
+- You buy Amazon stock at $100/share (50 shares = $5,000)
+- You sell it at $150/share (50 shares = $7,500)
+- Capital gain = $2,500
+
+**Tax implications**: 
+- Held <1 year = short-term capital gains (taxed as regular income)
+- Held >1 year = long-term capital gains (taxed at lower rates, often 15-20%)
+
+---
+
+==================================================================
+## 17. Common Stock
+**Definition**: A type of security representing ownership in a company with voting rights.
+
+**Example**: You buy 100 shares of Disney common stock. You now own a tiny fraction of Disney and get:
+- **Voting rights**: Vote on board members and major company decisions at annual meetings
+- **Dividends**: Share in profits if the company distributes them
+- **Capital appreciation**: Benefit if stock price rises
+
+However, if Disney goes bankrupt, common stockholders are paid last (after bondholders and preferred stockholders).
+
+---
+
+==================================================================
+## 18. Current Ratio
+**Definition**: A measure of a company's ability to pay short-term debt (current assets ÷ current liabilities).
+
+**Example**: 
+Company ABC has:
+- Current assets: $5 million (cash, inventory, receivables due within a year)
+- Current liabilities: $2.5 million (bills, short-term debt due within a year)
+- Current ratio = $5M ÷ $2.5M = 2.0
+
+A ratio above 1.0 means the company can cover its short-term obligations. A ratio of 2.0 is generally considered healthy—the company has $2 in assets for every $1 in liabilities.
+
+---
+
+==================================================================
+## 19. Day Trading
+**Definition**: The practice of buying and selling stocks within a single trading day.
+
+**Example**: 
+- 9:30 AM: You buy 100 shares of Tesla at $240 ($24,000)
+- 11:00 AM: Tesla rises to $245. You sell for $24,500 (profit: $500)
+- 2:00 PM: You buy 50 shares of Apple at $180 ($9,000)
+- 3:45 PM: Apple drops to $178. You sell for $8,900 (loss: $100)
+- Net for the day: $400 profit (minus fees)
+
+Day traders close all positions before market close to avoid overnight risk. This is high-risk and requires significant time and expertise.
+
+---
+
+==================================================================
+## 20. Debt-to-Equity Ratio
+**Definition**: A company's debt relative to its equity (total liabilities ÷ total shareholder equity).
+
+**Example**: 
+Company XYZ has:
+- Total liabilities (debt): $60 million
+- Shareholder equity (assets minus liabilities): $40 million
+- Debt-to-equity ratio = $60M ÷ $40M = 1.5
+
+This means the company has $1.50 in debt for every $1 of equity. 
+
+**Interpretation**:
+- Ratio < 1.0: More equity than debt (lower risk)
+- Ratio = 1.5: Moderate debt (common for growth companies)
+- Ratio > 2.0: High debt (higher risk but potentially higher returns)
+
+---
+
+==================================================================
+## 21. Diversification
+**Definition**: An investment strategy dividing funds across various assets to minimize risk.
+
+**Example**: Instead of investing $50,000 entirely in tech stocks, you diversify:
+- $15,000 in technology (Apple, Microsoft, Nvidia)
+- $10,000 in healthcare (Johnson & Johnson, Pfizer)
+- $10,000 in consumer goods (Procter & Gamble, Coca-Cola)
+- $5,000 in energy (ExxonMobil, NextEra Energy)
+- $5,000 in international stocks
+- $5,000 in bonds
+
+If tech crashes, your other investments cushion the loss. You're not "putting all eggs in one basket."
+
+---
+
+==================================================================
+## 22. Dividend
+**Definition**: A portion of a company's earnings paid out to shareholders.
+
+**Example**: You own 100 shares of AT&T. The company announces a quarterly dividend of $0.50 per share. You receive $50 (100 shares × $0.50) every quarter, or $200 per year. Dividends provide passive income without selling shares. Many retirees rely on dividend income.
+
+---
+
+==================================================================
+## 23. Dividend Yield
+**Definition**: A dividend expressed as a percentage of the stock price.
+
+**Example**: 
+- Verizon stock price: $40/share
+- Annual dividend: $2.50/share
+- Dividend yield = ($2.50 ÷ $40) × 100 = 6.25%
+
+This means you earn 6.25% annually on your investment through dividends alone. High dividend yields can indicate good income potential or a declining stock price.
+
+---
+
+==================================================================
+## 24. Dollar-Cost Averaging
+**Definition**: Investing a fixed amount regularly regardless of asset price.
+
+**Example**: You invest $500/month in an S&P 500 index fund:
+- **January**: Price = $400/share → You buy 1.25 shares
+- **February**: Price = $450/share → You buy 1.11 shares
+- **March**: Price = $380/share → You buy 1.32 shares
+- **April**: Price = $420/share → You buy 1.19 shares
+
+You've invested $2,000 and own 4.87 shares (average price: $411/share). This strategy reduces the impact of volatility—you automatically buy more when prices are low and less when prices are high.
+
+---
+
+==================================================================
+## 25. Dow Jones Industrial Average (DJIA)
+**Definition**: A stock market index of the 30 most-traded blue-chip stocks on the NYSE.
+
+**Example**: The Dow includes companies like:
+- Apple, Microsoft, Boeing, McDonald's, Visa, Nike, Disney, Coca-Cola
+
+When news says "The Dow rose 300 points today," it means the combined value of these 30 stocks increased. If the Dow is at 38,000 and rises to 38,300, that's a 0.79% gain. It's a quick snapshot of how large U.S. companies are performing.
+
+---
+
+==================================================================
+## 26. Earnings per Share (EPS)
+**Definition**: A company's profit divided by its outstanding shares.
+
+**Example**: 
+- Google (Alphabet) earns $76 billion in profit
+- Outstanding shares: 12.5 billion
+- EPS = $76B ÷ 12.5B = $6.08
+
+This means each share of Google earns $6.08 in profit annually. Rising EPS suggests growing profitability. Investors compare EPS over time and against competitors to evaluate company performance.
+
+---
+
+==================================================================
+## 27. Economic Bubble
+**Definition**: When asset prices surge far above their fundamental value.
+
+**Example**: 
+**The Dot-Com Bubble (1995-2000)**: Internet companies with no profits had stock prices soaring. Pets.com went public at $11/share, peaked at $14, then collapsed to $0 within a year. The company was burning cash but investors kept buying, expecting infinite growth. When reality hit, the bubble burst, and the Nasdaq fell 78% from its peak.
+
+**The Housing Bubble (2003-2007)**: Home prices doubled in many areas. People bought houses they couldn't afford, expecting to "flip" them for profit. When prices stopped rising, the bubble burst, causing the 2008 financial crisis.
+
+---
+
+==================================================================
+## 28. Equal Weight Rating
+**Definition**: An analyst rating suggesting a stock will perform similarly to the average of its peers.
+
+**Example**: An analyst covers 20 retail stocks. They rate Target as "Equal Weight," meaning they expect Target to perform about the same as the average of those 20 retailers over the next year. It's neither a strong buy nor a sell—it's a neutral rating.
+
+Other common ratings:
+- **Overweight**: Expected to outperform peers
+- **Underweight**: Expected to underperform peers
+
+---
+
+==================================================================
+## 29. Equity Income
+**Definition**: Income received from stock dividends.
+
+**Example**: Your portfolio contains:
+- 200 shares of Verizon paying $2.50/share annually = $500
+- 150 shares of Procter & Gamble paying $3.65/share annually = $547.50
+- 100 shares of Coca-Cola paying $1.84/share annually = $184
+
+Your total equity income = $1,231.50 per year. This is income from owning equities (stocks), not from selling them.
+
+---
+
+==================================================================
+## 30. Exchange
+**Definition**: A marketplace where investors buy and sell stocks.
+
+**Example**: 
+- **New York Stock Exchange (NYSE)**: The world's largest exchange. Companies like Walmart, Berkshire Hathaway, and Coca-Cola trade here.
+- **Nasdaq**: Second-largest exchange, known for tech companies like Apple, Amazon, Google, Tesla.
+- **International exchanges**: London Stock Exchange, Tokyo Stock Exchange, Hong Kong Stock Exchange
+
+Each exchange has listing requirements (minimum size, profitability, etc.) that companies must meet.
+
+---
+
+==================================================================
+## 31. Exchange-Traded Funds (ETFs)
+**Definition**: A collection of stocks or bonds in a single fund that trades on exchanges like a stock.
+
+**Example**: 
+**SPDR S&P 500 ETF (ticker: SPY)**: 
+- Contains all 500 companies in the S&P 500
+- One share costs about $450
+- By buying one share, you own tiny pieces of Apple, Microsoft, Amazon, and 497 other companies
+- Trades throughout the day like a stock
+- Expense ratio: 0.09% (you pay $9 annually per $10,000 invested)
+
+**Sector ETF Example - XLF (Financial Select Sector)**:
+- Contains only financial companies (JPMorgan, Bank of America, Wells Fargo)
+- Allows you to invest in one sector without picking individual stocks
+
+---
+
+==================================================================
+## 32. Expense Ratio
+**Definition**: The annual cost of owning a mutual fund or ETF, expressed as a percentage.
+
+**Example**: 
+You invest $10,000 in a mutual fund with a 1.0% expense ratio:
+- Annual fee = $10,000 × 0.01 = $100
+
+**Comparison**:
+- **Expensive fund**: 1.5% expense ratio = $150/year on $10,000
+- **Low-cost index fund**: 0.04% expense ratio = $4/year on $10,000
+
+Over 30 years, a 1% difference in fees can cost you hundreds of thousands in lost returns due to compound growth.
+
+---
+
+==================================================================
+## 33. Futures
+**Definition**: A contract to buy or sell an asset at a predetermined price on a future date.
+
+**Example**: 
+You're a coffee shop owner worried coffee prices will rise. Today, coffee costs $2/pound. You buy a futures contract to purchase 10,000 pounds of coffee in 6 months at $2.10/pound.
+
+**Scenario 1**: In 6 months, coffee costs $3/pound. You exercise your contract, buy at $2.10, and save $0.90/pound ($9,000 saved).
+
+**Scenario 2**: In 6 months, coffee costs $1.80/pound. You still must buy at $2.10, losing $0.30/pound ($3,000 loss), but you've hedged against price increases.
+
+Futures are also used by speculators betting on price movements without actually wanting the physical commodity.
+
+---
+
+==================================================================
+## 34. Going Long
+**Definition**: Buying stock shares expecting the price to rise.
+
+**Example**: 
+- You believe electric vehicles are the future
+- You buy 50 shares of Rivian at $20/share ($1,000 investment)
+- Six months later, Rivian is at $30/share
+- You sell for $1,500 (50 × $30)
+- Profit: $500 (50% return)
+
+This is the traditional "buy low, sell high" strategy. You're "long" on Rivian, betting the price will increase.
+
+---
+
+==================================================================
+## 35. Going Short
+**Definition**: Selling borrowed shares expecting the price to fall, then buying them back cheaper.
+
+**Example**: 
+You believe MoviePass is overvalued at $50/share:
+
+1. **Borrow** 100 shares from your broker and immediately **sell** them for $5,000
+2. Stock drops to $20/share as you predicted
+3. You **buy** 100 shares for $2,000
+4. **Return** the 100 shares to your broker
+5. **Profit**: $3,000 ($5,000 - $2,000)
+
+**Risk**: If the stock rises to $80 instead, you must buy shares at $8,000 to return them, losing $3,000. Losses can be unlimited since there's no cap on how high a stock can rise.
+
+---
+
+==================================================================
+## 36. Growth and Income Funds
+**Definition**: Mutual funds or ETFs with both capital appreciation and dividend income.
+
+**Example**: 
+**Vanguard Growth and Income Fund** holds:
+- **Growth stocks**: Amazon, Google (high growth potential, no dividends)
+- **Income stocks**: AT&T, Johnson & Johnson (steady dividends, slower growth)
+
+This provides:
+- **Capital gains** when growth stocks rise in price
+- **Income** from dividend-paying stocks
+
+It's a balanced approach for investors who want both current income and long-term growth.
+
+---
+
+==================================================================
+## 37. Growth Stocks
+**Definition**: Stocks of companies expected to grow revenues significantly faster than the industry average.
+
+**Example**: 
+**Tesla (2019-2021)**: 
+- Revenue grew from $24.6B (2019) to $53.8B (2021)—119% growth in 2 years
+- Stock price rose from $20 to $380 (1,800% gain)
+- Pays no dividends—all profits reinvested in expansion
+
+**Characteristics**:
+- High P/E ratios (investors pay premium for future growth)
+- Reinvest profits rather than pay dividends
+- Higher volatility and risk
+- Examples: Nvidia, Shopify, Netflix (during growth phase)
+
+**Contrast with value stocks**: Companies like Ford grow slowly but trade at lower prices relative to earnings.
+
+---
+
+==================================================================
+## 38. Head and Shoulders Pattern
+**Definition**: A chart formation indicating a potential trend reversal from bullish to bearish.
+
+**Example**: 
+Imagine a stock's price over 6 months:
+- **Left shoulder**: Price rises from $50 to $60, then falls back to $55
+- **Head**: Price rises from $55 to $70, then falls back to $55
+- **Right shoulder**: Price rises from $55 to $62, then starts falling
+
+The pattern looks like a head with two shoulders. The "neckline" is at $55. When the price breaks below $55 after forming the right shoulder, it signals a likely bear market ahead. Traders often sell when this pattern completes.
+
+---
+
+==================================================================
+## 39. Index Funds
+**Definition**: Investment funds that track a specific market index.
+
+**Example**: 
+**Vanguard S&P 500 Index Fund (VFIAX)**:
+- Tracks the S&P 500 index
+- Automatically holds all 500 companies in the same proportions as the index
+- If Apple is 7% of the S&P 500, then 7% of the fund is in Apple
+- Expense ratio: 0.04% (very low cost)
+- Returns match the S&P 500 (minus tiny fees)
+
+You invest $10,000. The fund automatically distributes it across all 500 companies. You get instant diversification. When the S&P 500 rises 10%, so does your investment.
+
+---
+
+==================================================================
+## 40. Inflation
+**Definition**: The rate of increase in prices for goods and services.
+
+**Example**: 
+In 2020, a gallon of milk cost $3.50. In 2024, it costs $4.20. That's a 20% increase over 4 years, or about 5% annual inflation.
+
+**Impact on investing**:
+- Your investment returns need to beat inflation to gain real purchasing power
+- If inflation is 3% and your investment returns 5%, your real return is only 2%
+- If inflation is 3% and your savings account earns 1%, you're losing 2% in purchasing power annually
+
+**2021-2023 Example**: U.S. inflation peaked at 9% in 2022, the highest in 40 years, driven by supply chain issues and stimulus spending.
+
+---
+
+==================================================================
+## 41. Initial Public Offering (IPO)
+**Definition**: When a private company first sells stock to the public.
+
+**Example**: 
+**Airbnb IPO (December 2020)**:
+- Previously, only private investors (venture capitalists) could own Airbnb shares
+- Airbnb decided to "go public" to raise money and allow early investors to cash out
+- IPO price: $68/share
+- First day closing price: $144 (112% gain for those who got IPO allocation)
+- Public investors could now buy Airbnb on Nasdaq
+
+Companies go public to raise capital for expansion, but also face increased regulation and quarterly reporting requirements.
+
+---
+
+==================================================================
+## 42. Limit Order
+**Definition**: An order to buy or sell a stock at or below a specific price.
+
+**Example**: 
+**Buy Limit Order**: Disney is trading at $95, but you only want to buy at $90 or less. You place a limit order to buy 100 shares at $90. If Disney drops to $90, your order executes automatically. If it stays above $90, nothing happens.
+
+**Sell Limit Order**: You own Netflix at $450 and want to sell at $500. You set a sell limit order at $500. When/if Netflix reaches $500, your shares automatically sell.
+
+**Benefit**: You control your price, unlike market orders that execute at whatever the current price is.
+
+---
+
+==================================================================
+## 43. Liquidity
+**Definition**: How quickly and easily an asset can be bought or sold without impacting its price.
+
+**Example**: 
+**High liquidity - Apple stock**:
+- Millions of shares trade daily
+- You can sell 100 shares instantly at the current price
+- Bid-ask spread: $0.01
+
+**Low liquidity - Small biotech company**:
+- Only a few thousand shares trade daily
+- Your order to sell 10,000 shares might take days and push the price down
+- Bid-ask spread: $0.50 or more
+
+**Very low liquidity - Your house**:
+- Might take months to sell
+- Price negotiable and can vary significantly
+- High transaction costs
+
+**Most liquid - Cash**:
+- Already in its most useful form, no conversion needed
+
+---
+
+==================================================================
+## 44. Margin
+**Definition**: Borrowing money from a broker to purchase stock.
+
+**Example**: 
+You have $10,000 and want to buy more stock:
+- You buy $10,000 of Tesla with your own money
+- Your broker lends you another $10,000 (50% margin)
+- You now control $20,000 worth of Tesla stock
+
+**If Tesla rises 20%**:
+- Your stock is now worth $24,000
+- You repay the $10,000 loan (plus interest)
+- You keep $14,000 (40% gain on your original $10,000)
+
+**If Tesla falls 20%**:
+- Your stock is now worth $16,000
+- You still owe $10,000
+- You're left with $6,000 (40% loss on your original $10,000)
+
+**Margin call**: If your stock falls too much, the broker demands you add more money or they'll sell your shares to cover the loan.
+
+---
+
+==================================================================
+## 45. Market Index
+**Definition**: A tool that tracks the performance of a collection of stocks representing an industry or market.
+
+**Example**: 
+**S&P 500**: Tracks 500 large U.S. companies across all sectors. When the index rises from 4,500 to 4,600, it means the average value of those 500 companies increased about 2.2%.
+
+**Nasdaq Composite**: Tracks over 3,000 companies on the Nasdaq exchange, heavily weighted toward technology.
+
+**Russell 2000**: Tracks 2,000 small-cap U.S. companies, showing how smaller businesses perform.
+
+Investors use indexes to benchmark their portfolio performance. If the S&P 500 gains 15% in a year and your portfolio only gains 8%, you underperformed the market.
+
+---
+
+==================================================================
+## 46. Market Volatility
+**Definition**: A measure of how much and how often the stock market fluctuates.
+
+**Example**: 
+**Low volatility period (2017)**: The S&P 500 rose steadily with few dramatic swings. Daily movements averaged 0.3%.
+
+**High volatility period (March 2020, COVID-19 pandemic)**: 
+- The S&P 500 fell from 3,380 to 2,237 in one month (34% drop)
+- Daily swings of 5-10% were common
+- The VIX (volatility index) spiked from 15 to 82
+
+**Why it matters**: Used to calculate market cap and earnings per share.
+
+==================================================================
+## 47. Moving Average
+**Definition**: The average price of a stock over a specific time period, used to identify trends.
+
+**Example**: 
+**50-day moving average for Apple**:
+- Add up Apple's closing price for the last 50 days
+- Divide by 50
+- Today that might be $180
+
+Each day, the oldest price drops off and the newest is added. If Apple's current price ($185) is above its 50-day moving average ($180), it signals an upward trend.
+
+**Golden Cross**: When the 50-day moving average crosses above the 200-day moving average—a bullish signal.
+
+**Death Cross**: When the 50-day crosses below the 200-day—a bearish signal.
+
+---
+
+==================================================================
+## 48. Mutual Funds
+**Definition**: Pools of money from many investors used to buy a diversified portfolio of securities.
+
+**Example**: 
+**Fidelity Contrafund**:
+- You invest $5,000
+- Your money is pooled with millions from other investors (total fund: $100 billion)
+- Professional fund managers use the pool to buy stocks in Meta, Amazon, Microsoft, etc.
+- You own a proportional share of all these holdings
+- Fund charges 0.85% expense ratio
+- You can only buy/sell once per day at closing price (unlike ETFs that trade all day)
+
+Mutual funds are actively managed (managers pick stocks) or passive (track an index).
+
+---
+
+==================================================================
+## 49. Nasdaq
+**Definition**: An electronic stock exchange and a stock market index.
+
+**Example**: 
+**As an exchange**: A digital marketplace where tech companies primarily list. Companies like Apple (AAPL), Microsoft (MSFT), and Tesla (TSLA) trade here. Unlike the NYSE, there's no physical trading floor—everything is electronic.
+
+**As an index (Nasdaq Composite)**: Tracks over 3,300 companies listed on the Nasdaq exchange. When news says "The Nasdaq rose 2% today," they mean the composite index increased 2%.
+
+**Nasdaq-100**: A subset tracking the 100 largest non-financial companies on Nasdaq (Apple, Microsoft, Amazon, Google, Tesla, Nvidia, etc.).
+
+---
+
+==================================================================
+## 50. Non-Fungible Token (NFT)
+**Definition**: A unique digital asset recorded on a blockchain that cannot be replicated.
+
+**Example**: 
+**Bored Ape Yacht Club NFT #7089**: Sold for $2.9 million. It's a digital image of a cartoon ape. The blockchain proves you own this specific ape—not a copy, but THE original digital file.
+
+**How it works**: The NFT is stored on the Ethereum blockchain with a unique ID. While anyone can view the image, only you can prove ownership through the blockchain record.
+
+**Other uses**: 
+- Digital art
+- Virtual real estate in metaverse games
+- Concert tickets (can't be counterfeited)
+- Proof of ownership for physical items
+
+**"Non-fungible"** means unique. A dollar bill is fungible (any dollar equals any other dollar). Each NFT is unique and can't be exchanged 1:1 with another NFT.
+
+---
+
+==================================================================
+## 51. Order Imbalance
+**Definition**: When buy or sell orders aren't offset by opposite orders, causing excess demand or supply.
+
+**Example**: 
+A company announces bankruptcy before market open:
+- 500,000 shares queued to SELL
+- Only 50,000 shares queued to BUY
+- Order imbalance: 450,000 shares (sell-side)
+
+When the market opens, the massive sell pressure with few buyers causes:
+- Stock price crashes from $25 to $10 in minutes
+- High volatility as the market searches for equilibrium
+- Trading might be halted temporarily
+
+**Positive example**: Company announces groundbreaking drug approval:
+- 1 million shares queued to BUY
+- Only 100,000 shares queued to SELL
+- Price spikes from $40 to $75 at market open
+
+---
+
+==================================================================
+## 52. OTC Stocks (Over-the-Counter)
+**Definition**: Securities traded through broker-dealer networks instead of major exchanges.
+
+**Example**: 
+A small biotech startup with $5 million in revenue can't meet NYSE requirements (which need $10 million+ in revenue, minimum stock price, etc.). They trade OTC instead.
+
+**OTC ticker example**: ABCD (four letters vs. 1-3 for major exchanges)
+
+**Risks**:
+- Less regulatory oversight
+- Lower liquidity (harder to sell)
+- Wider bid-ask spreads
+- More susceptible to manipulation
+- Less financial disclosure required
+
+**Who trades OTC**: Penny stocks, foreign companies, companies that fell below exchange requirements.
+
+---
+
+==================================================================
+## 53. Outstanding Shares
+**Definition**: The total number of a company's shares issued to shareholders, including restricted shares.
+
+**Example**: 
+**Microsoft**:
+- Outstanding shares: 7.5 billion
+- This includes shares owned by:
+  - Individual investors (you, me)
+  - Institutional investors (pension funds, mutual funds)
+  - Company insiders (executives with restricted stock)
+  - Treasury stock is NOT included (shares the company bought back)
+--
+
+==================================================================
+## 54. P/E Ratio (Price-to-Earnings Ratio)
+**Definition**: The ratio of a company's share price to its earnings per share, used to value a company.
+
+**Example**: 
+**Amazon**:
+- Stock price: $140/share
+- Earnings per share: $2.80
+- P/E ratio = $140 ÷ $2.80 = 50
+
+This means investors are willing to pay $50 for every $1 of Amazon's annual earnings.
+
+**Interpretation**:
+- **High P/E (50+)**: Investors expect high future growth (tech companies like Tesla, Nvidia)
+- **Low P/E (10-15)**: Mature, stable companies or undervalued stocks (banks, utilities)
+- **No P/E**: Company has no earnings (losses)
+
+**Comparison**: If the average P/E in the tech sector is 30 and a company has a P/E of 15, it might be undervalued relative to peers.
+
+---
+
+==================================================================
+## 55. Preferred Stock
+**Definition**: Stock that combines features of common stock and bonds, with dividend priority but usually no voting rights.
+
+**Example**: 
+You buy 100 shares of Bank of America preferred stock at $25/share:
+- **Dividend**: Fixed $1.50/share annually (6% yield), paid before common stockholders
+- **Priority**: If the bank struggles, preferred shareholders get paid before common shareholders
+- **No voting rights**: You can't vote on company decisions
+- **Less upside**: If common stock doubles, preferred stock might only rise 20%
+
+**Use case**: Income-focused investors (retirees) who want steady dividends with less risk than common stock, but less growth potential.
+
+---
+
+==================================================================
+## 56. Price Quote
+**Definition**: The current price of a stock or security as listed on an exchange, with supplemental information.
+
+**Example**: 
+**Apple (AAPL) price quote**:
+- Last price: $180.50
+- Bid: $180.48 (buyers willing to pay)
+- Ask: $180.52 (sellers asking)
+- Volume: 52.3 million shares traded today
+- Day's range: $178.20 - $181.00
+- 52-week range: $164.08 - $199.62
+- P/E ratio: 29.5
+- Market cap: $2.78 trillion
+
+This information helps you decide if now is a good time to buy or sell.
+
+---
+
+==================================================================
+## 57. Profit Margin
+**Definition**: A company's profitability expressed as a percentage (net profit ÷ total revenue × 100).
+
+**Example**: 
+**Walmart**:
+- Total revenue: $600 billion
+- Total expenses: $585 billion
+- Net profit: $15 billion
+- Profit margin = ($15B ÷ $600B) × 100 = 2.5%
+
+Walmart makes $2.50 in profit for every $100 in sales.
+
+**Apple**:
+- Revenue: $400 billion
+- Net profit: $100 billion
+- Profit margin = 25%
+
+Apple makes $25 profit per $100 in sales—much higher than Walmart due to premium pricing.
+
+**Industry comparison**: Tech companies (20-30%), retailers (2-5%), banks (15-25%).
+
+---
+
+==================================================================
+## 58. Recession
+**Definition**: A period of economic decline lasting at least several months.
+
+**Example**: 
+**2008 Financial Crisis Recession**:
+- Started: December 2007
+- Ended: June 2009
+- Duration: 18 months
+- **Characteristics**:
+  - GDP fell 4.3%
+  - Unemployment rose from 5% to 10%
+  - Stock market fell 50%
+  - Home prices dropped 30%
+  - Consumer spending declined
+
+**2020 COVID Recession**:
+- Duration: February-April 2020 (shortest on record)
+- GDP fell 19.2% in Q2 2020
+- Unemployment spiked to 14.7%
+- Caused by pandemic lockdowns
+
+**Technical definition**: Two consecutive quarters of negative GDP growth.
+
+---
+
+==================================================================
+## 59. Risk Tolerance
+**Definition**: The level of risk you're willing to accept on investments.
+
+**Example**: 
+**Low risk tolerance (age 65, retiring soon)**:
+- 70% bonds (stable, predictable income)
+- 20% dividend-paying stocks (Coca-Cola, Verizon)
+- 10% cash
+- Goal: Preserve capital, avoid losses
+- Expected return: 4-6% annually
+
+**High risk tolerance (age 25, 40 years until retirement)**:
+- 90% stocks (growth companies, tech, emerging markets)
+- 10% bonds
+- Goal: Maximum growth
+- Expected return: 8-12% annually with higher volatility
+
+**Assessment**: If a 30% market drop would make you panic-sell, you have lower risk tolerance. If you'd buy more during the dip, you have higher risk tolerance.
+
+---
+
+==================================================================
+## 60. Roth IRA
+**Definition**: A retirement account where you contribute after-tax dollars, and withdrawals in retirement are tax-free.
+
+**Example**: 
+You're 30 years old earning $60,000/year:
+- You contribute $6,000/year to a Roth IRA (already taxed at your current 22% rate)
+- You invest in index funds that average 8% annual returns
+- After 35 years, your account grows to $1.03 million
+- At age 65, you withdraw $50,000/year tax-free
+
+**Comparison to Traditional IRA**: You'd contribute $6,000 pre-tax (saving $1,320 in taxes now), but pay taxes on the $1.03 million when you withdraw it in retirement.
+
+**Benefit**: If you expect to be in a higher tax bracket in retirement or if tax rates increase, Roth is advantageous.
+
+**2024 limits**: $7,000/year ($8,000 if over 50), income limits apply.
+
+---
+
+==================================================================
+## 61. Sector
+**Definition**: A group of companies with similar business products, services, or characteristics.
+
+**Example**: 
+**The 11 stock market sectors**:
+
+1. **Technology**: Apple, Microsoft, Nvidia (software, hardware, semiconductors)
+2. **Healthcare**: Johnson & Johnson, Pfizer, UnitedHealth (pharmaceuticals, medical devices, insurance)
+3. **Financials**: JPMorgan Chase, Visa, Berkshire Hathaway (banks, insurance, payments)
+4. **Consumer Discretionary**: Amazon, Tesla, McDonald's (retail, cars, restaurants)
+5. **Communication Services**: Google, Meta, Netflix (internet, social media, entertainment)
+6. **Industrials**: Boeing, Caterpillar, UPS (manufacturing, aerospace, logistics)
+7. **Consumer Staples**: Procter & Gamble, Coca-Cola, Walmart (food, household goods)
+8. **Energy**: ExxonMobil, Chevron (oil, gas, renewable energy)
+9. **Utilities**: Duke Energy, NextEra Energy (electricity, water, gas)
+10. **Real Estate**: REITs, property companies
+11. **Materials**: Dow Chemical, Freeport-McMoRan (chemicals, metals, mining)
+
+Sectors rotate in and out of favor based on economic conditions.
+
+---
+
+==================================================================
+## 62. Shares
+**Definition**: Units of ownership in a company's stock.
+
+**Example**: 
+Apple has 15.5 billion total shares outstanding. You buy 100 shares at $180 each ($18,000 investment).
+
+You now own:
+- 100 ÷ 15,500,000,000 = 0.000000645% of Apple
+- Entitled to 0.000000645% of any dividends paid
+- 100 votes at shareholder meetings
+- Right to sell those shares at any time
+
+If Apple's total value is $2.79 trillion, your 100 shares represent $18,000 of that value.
+
+---
+
+==================================================================
+## 63. Stock Market Holidays
+**Definition**: Days when U.S. stock exchanges are closed.
+
+**Example**: 
+**2024 U.S. Stock Market Holidays**:
+1. New Year's Day (January 1)
+2. Martin Luther King Jr. Day (January 15)
+3. Presidents' Day (February 19)
+4. Good Friday (March 29)
+5. Memorial Day (May 27)
+6. Juneteenth (June 19)
+7. Independence Day (July 4)
+8. Labor Day (September 2)
+9. Thanksgiving (November 28)
+10. Christmas (December 25)
+
+**Early close days**: Markets close at 1 PM ET on the day after Thanksgiving and Christmas Eve.
+
+**Why it matters**: You can't trade stocks on these days. Any orders placed execute when markets reopen.
+
+---
+
+==================================================================
+## 64. Stock Option
+**Definition**: A contract giving the right (not obligation) to buy or sell stock at a predetermined price within a specific timeframe.
+
+**Example**: 
+**Call Option (right to buy)**:
+- Tesla is trading at $250
+- You buy a call option to purchase 100 shares at $260 (strike price) anytime in the next 3 months
+- Option cost: $500 ($5 per share × 100)
+- **If Tesla rises to $300**: You exercise the option, buy at $260, immediately sell at $300 = $4,000 profit (100 × $40) minus $500 option cost = $3,500 net profit
+- **If Tesla stays at $250**: Option expires worthless, you lose $500
+
+**Put Option (right to sell)**:
+- You think Tesla will fall
+- Buy put option to sell at $240 when stock is at $250
+- If it drops to $200, you profit from selling at $240 when market price is $200
+
+**Employee stock options**: Companies grant employees options to buy company stock at a fixed price as compensation.
+
+---
+
+==================================================================
+## 65. Stock Portfolio
+**Definition**: An individual's collection of investments including stocks, bonds, mutual funds, and other assets.
+
+**Example**: 
+**Your portfolio**:
+
+**Stocks (60% - $60,000)**:
+- Apple: 100 shares worth $18,000
+- Microsoft: 50 shares worth $19,000
+- Tesla: 40 shares worth $10,000
+- Disney: 80 shares worth $7,600
+- Small-cap stocks: $5,400
+
+**ETFs (20% - $20,000)**:
+- Vanguard S&P 500 ETF: $15,000
+- International ETF: $5,000
+
+**Bonds (15% - $15,000)**:
+- U.S. Treasury bonds: $10,000
+- Corporate bonds: $5,000
+
+**Cash (5% - $5,000)**:
+- Emergency fund in money market
+
+**Total portfolio value**: $100,000
+
+You might track this across multiple accounts (401k, Roth IRA, taxable brokerage).
+
+---
+
+==================================================================
+## 66. Stock Split
+**Definition**: When a company increases outstanding shares by distributing more shares to current stockholders, making shares more affordable.
+
+**Example**: 
+**Nvidia 10-for-1 stock split (June 2024)**:
+
+**Before split**:
+- You own: 10 shares
+- Price per share: $1,200
+- Total value: $12,000
+
+**After split**:
+- You own: 100 shares (10 × 10)
+- Price per share: $120 ($1,200 ÷ 10)
+- Total value: $12,000 (unchanged)
+
+**Why companies split**: $1,200/share is expensive for retail investors. At $120/share, more people can afford to buy, increasing liquidity.
+
+**Reverse split example**: A struggling stock at $2/share does a 1-for-10 reverse split. You have 100 shares worth $200. After split: 10 shares at $20 each, still worth $200. This helps companies avoid delisting (exchanges require minimum prices like $1/share).
+
+---
+
+==================================================================
+## 67. Time Horizon
+**Definition**: The period you expect to hold an investment before needing the money.
+
+**Example**: 
+**Short time horizon (1-3 years) - Saving for house down payment**:
+- Portfolio: 70% bonds, 20% dividend stocks, 10% cash
+- Low risk because you need the money soon
+- Can't afford a market crash right before you buy the house
+
+**Medium time horizon (10-15 years) - Child's college fund**:
+- Portfolio: 60% stocks, 35% bonds, 5% cash
+- Moderate risk with time to recover from downturns
+
+**Long time horizon (30+ years) - Retirement at age 25**:
+- Portfolio: 90% stocks, 10% bonds
+- High risk acceptable because you have decades to ride out market volatility
+- Historical data shows stocks outperform over 30+ year periods
+
+**Rule of thumb**: Longer horizon = more stocks (growth); shorter horizon = more bonds (stability).
+
+---
+
+==================================================================
+## 68. Value Stocks
+**Definition**: Shares of companies selling below their intrinsic value, which investors expect to rise.
+
+**Example**: 
+**Ford Motor Company**:
+- Stock price: $12
+- P/E ratio: 6 (low compared to market average of 25)
+- Dividend yield: 5%
+- Strong brand, profitable, but undervalued due to economic concerns
+
+**Value investors** believe:
+- The market overreacted to bad news
+- The company's fundamentals (earnings, assets) are stronger than the stock price suggests
+- Price will eventually rise to reflect true value
+
+**Warren Buffett's strategy**: Buy undervalued companies with strong fundamentals and hold long-term.
+
+**Contrast with growth stocks**: 
+- **Value**: Ford at P/E of 6, slow growth
+- **Growth**: Tesla at P/E of 60, rapid expansion
+
+---
+
+==================================================================
+## 69. Volume
+**Definition**: The number of shares traded over a certain period.
+
+**Example**: 
+**Apple daily volume**: 52 million shares traded today
+
+**What it tells you**:
+- **High volume + price increase**: Strong buying interest (bullish signal)
+- **High volume + price decrease**: Strong selling pressure (bearish signal)
+- **Low volume**: Lack of interest, price moves less reliable
+
+**Example scenario**: 
+Netflix announces subscriber growth:
+- Normal daily volume: 5 million shares
+- Today's volume: 45 million shares (9× normal)
+- Price jumps 15%
+- **Interpretation**: High volume confirms the price move is significant and backed by strong investor conviction
+
+**Penny stock trap**: Low volume means your sell order could drop the price significantly.
+
+---
+
+==================================================================
+## 70. Volume-Weighted Average Price (VWAP)
+**Definition**: The average trading price of a stock adjusted for volume.
+
+**Example**: 
+Throughout the day, Amazon trades:
+- 9:30 AM: 100,000 shares at $140
+- 11:00 AM: 500,000 shares at $142
+- 2:00 PM: 300,000 shares at $141
+- 4:00 PM: 100,000 shares at $143
+
+**Regular average**: ($140 + $142 + $141 + $143) ÷ 4 = $141.50
+
+**VWAP**: 
+- Total value: (100K × $140) + (500K × $142) + (300K × $141) + (100K × $143) = $141.6M
+- Total volume: 1 million shares
+- VWAP = $141.6M ÷ 1M = $141.60
+
+VWAP gives more weight to the 500,000 shares traded at $142 because that's where most trading occurred.
+
+**Use**: Institutional traders use VWAP to ensure they're getting fair prices on large orders.
+
+---
+
+==================================================================
+## 71. Yield
+**Definition**: Income earned on an investment over a period, expressed as a percentage of the original investment.
+
+**Example**: 
+**Bond yield**:
+- You buy a $10,000 bond paying $500 annually
+- Yield = ($500 ÷ $10,000) × 100 = 5%
+
+**Stock dividend yield**:
+- You buy stock at $50/share
+- Annual dividend: $2/share
+- Yield = ($2 ÷ $50) × 100 = 4%
+
+**Real estate yield**:
+- You buy a rental property for $300,000
+- Annual rental income: $18,000
+- Yield = ($18,000 ÷ $300,000) × 100 = 6%
+
+**Why it matters**: Helps compare income potential across different investments. A 6% yield on a rental property might beat a 2% bond yield, but consider risk, liquidity, and work required.
+
+---
+
+==================================================================
+## 72. 52-Week Range
+**Definition**: The lowest and highest price of a stock during the past 52 weeks (one year).
+
+**Example**: 
+**Microsoft**:
+- 52-week range: $309.45 - $468.35
+- Current price: $380
+
+**Analysis**:
+- Trading near the **low ($309)** might indicate the stock is undervalued or facing serious problems
+- Trading near the **high ($468)** might indicate strong performance or overvaluation
+- Current price ($380) is in the **middle range**, suggesting neither extreme optimism nor pessimism
+
+**Trading strategy**: Some investors buy when a stock breaks above its 52-week high (momentum strategy) or when it's near its 52-week low (value strategy).
+
+**Example**: Tesla's 52-week range might be $140-$270. At $145, value investors might buy expecting a rebound. At $265, momentum traders might buy expecting it to break to new highs.
+
+---
+
+==================================================================
+## 73. Equity
+**Definition**: Ownership in a company, used interchangeably with "stock" or "share."
+
+**Example**: 
+**In stocks**:
+- "I have $50,000 in equity investments" = "I own $50,000 worth of stocks"
+- "I'm building equity" = "I'm accumulating ownership in companies"
+
+**In real estate**:
+- You buy a house for $400,000 with a $320,000 mortgage
+- Home equity = $400,000 (value) - $320,000 (debt) = $80,000
+- After 10 years, you owe $200,000 and the house is worth $500,000
+- Home equity = $300,000
+
+**In a company's balance sheet**:
+- Total assets: $1 million
+- Total liabilities: $600,000
+- Shareholder equity = $400,000
+- This is what would be left for owners if all debts were paid
+
+**Private equity**: Ownership in private (non-public) companies, like venture capital investments in startups.
+
+==================================================================
