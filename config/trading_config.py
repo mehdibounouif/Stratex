@@ -4,7 +4,7 @@ class TradingConfig:
     INITIAL_CAPITAL = 1000 #$
 
     # Defualt Stock Watchlist
-    DEFAULT_WTCHLIST = [
+    DEFAULT_WATCHLIST = [
             'AAPL', 'MSFT', 'NVDA', 'GOOGL', 'META'
             'TSLA', 'AMZN', 'AMD', 'NFLX']
 
