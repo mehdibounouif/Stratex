@@ -5,7 +5,7 @@ class RiskManager:
         self.config = RiskConfig()
         self.current_portfolio_value = 10000
         self.current_cach = 1000
-        self.num_positions = 10
+        self.num_positions = 20
         print("Using test risk manager (Message for B3aybach)")
 
     def check_position_size(self, size):

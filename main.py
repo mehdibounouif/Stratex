@@ -3,7 +3,7 @@ from system.system_architect import trading_system
 
 def main():
    
-    print("\nSelect operation:")
+    print("Select operation:")
     print("1. Analyze single stock")
     print("2. Scan entire watchlist")
     print("3. Run daily analysis")
