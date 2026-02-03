@@ -23,5 +23,5 @@ def test_data_access():
     assert not data.empty
     assert 'Close' in data.columns
 
-if __name__ == "__main__":
-    pytest.main([__file__, '-v'])
+#if __name__ == "__main__":
+#    pytest.main([__file__, '-v'])
