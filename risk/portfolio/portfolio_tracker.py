@@ -300,8 +300,8 @@ if __name__ == "__main__":
     
     # Update prices
     position_tracker.update_prices({
-        'AAPL': 198.50,
-        'MSFT': 385.20
+        'AAPL': 100.50,
+        'MSFT': 28.20
     })
     
     # Display again
