@@ -1,7 +1,7 @@
 class TradingConfig:
 
     # Defualt capital
-    INITIAL_CAPITAL = 1000 #$
+    INITIAL_CAPITAL = 20000 #$
 
     # Defualt Stock Watchlist
     DEFAULT_WATCHLIST = [
