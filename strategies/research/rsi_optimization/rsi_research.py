@@ -6,13 +6,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 
-# Ensure Python can find your 'data' module
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../data'))
-from data.data_engineer import data_access  # make sure this matches your data folder structure
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../'))
+sys.path.append(project_root)
+from data.data_enginner import data_access
 
-# -----------------------------
-# Helper Functions
-# -----------------------------
 def calculate_rsi(prices, period=14):
     """Calculate Relative Strength Index (RSI)."""
     delta = prices.diff()
@@ -31,9 +28,10 @@ def backtest_rsi_strategy(ticker, data, rsi_buy, rsi_sell, holding_days, stop_lo
     trades = []
 
     for i in range(len(data)):
+
         # BUY signal
         if data['RSI'].iloc[i] < rsi_buy and position == 0:
-            entry_price = data['Close'].iloc[i]
+            entry_price = float(data['Close'].iloc[i])
             entry_date = data.index[i]
             shares = capital / entry_price
             position = shares
@@ -47,7 +45,7 @@ def backtest_rsi_strategy(ticker, data, rsi_buy, rsi_sell, holding_days, stop_lo
 
         # SELL signal
         elif position > 0:
-            current_price = data['Close'].iloc[i]
+            current_price = float(data['Close'].iloc[i])
             days_held = i - trades[-1].get('entry_index', i)
             pnl_pct = (current_price - trades[-1]['entry_price']) / trades[-1]['entry_price']
 
@@ -94,11 +92,10 @@ def backtest_rsi_strategy(ticker, data, rsi_buy, rsi_sell, holding_days, stop_lo
         'trades': trades
     }
 
-# -----------------------------
-# Main Function
-# -----------------------------
 def main():
     results = []
+#    data = data_access.get_price_history('AAPL', days=365)
+#    backtest_rsi_strategy('AAPL',data, 20, 80, 3, 0.03)
 
     tickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'META']
     rsi_thresholds = [(20, 80), (25, 75), (30, 70), (35, 65)]
@@ -141,8 +138,5 @@ def main():
     plt.savefig('strategies/research/rsi_optimization/rsi_comparison.png')
     plt.show()
 
-# -----------------------------
-# Run if script is executed
-# -----------------------------
 if __name__ == "__main__":
     main()

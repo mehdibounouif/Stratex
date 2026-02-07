@@ -48,7 +48,7 @@ data_access = DataEngineer()
 
 if __name__ == "__main__":
     print("Testing Data Enginner...")
-    data = data_access.get_price_history('NFLX', days=30)
+    data = data_access.get_price_history('AAPL', days=30)
 #    print(f"data column : {data.columns}")
 #    print(f"data type : {type(data.columns)}")
     print(f"\nSample data:\n {data}")
