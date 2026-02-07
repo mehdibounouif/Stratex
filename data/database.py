@@ -16,7 +16,7 @@ Before emplementation verify:
 """
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from config import BaseConfig
 import pandas as pd
 
@@ -108,6 +108,15 @@ class Database:
             print(f"✅ Table '{table_name}' has been deleted.")
         except sqlite3.Error as e:
             print(f"❌ Failed to delete table '{table_name}': {e}")
+    def delete_data_from_table(self, nameoftable, ticker):
+        self.ensure_connected()
+        sql = f"DELETE FROM {nameoftable} WHERE ticker = ?"
+        try:
+            self.cursor.execute(sql, (ticker,))
+            self.conn.commit()
+            print(f"✅ Deleted all rows for ticker {ticker} from {nameoftable}")
+        except sqlite3.Error as e:
+            print(f"❌ Failed to delete data from {nameoftable}: {e}")
     def insert_stock_prices(self, ticker, date, open, high, low, close, volume):
         self.ensure_connected()
         self.check_if_the_table_exist("stock_prices")
@@ -137,7 +146,7 @@ class Database:
         return rows
     def insert_fundamental(self, ticker, date, revenue, net_income, eps, pe_ratio):
         self.ensure_connected()
-        self.check_if_the_table_exist("fundamental")
+        self.check_if_the_table_exist("fundamentals")
         sql = """
         INSERT OR IGNORE INTO fundamentals(ticker, date, revenue, net_income, eps, pe_ratio)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -190,4 +199,17 @@ class Database:
 db = Database()
 if __name__== "__main__":
     db.connect()
+    # db.check_if_the_table_exist("stock_prices")
+    # db.check_if_the_table_exist("news")
+    # db.check_if_the_table_exist("fundamentals")
+    # db.delete_data_from_table("stock_prices", "AAPL")
+    # db.delete_data_from_table("stock_prices", "AL")
+    # db.delete_data_from_table("stock_prices", "AAP")
+    # # db.insert_stock_prices("AAPL", "2026-02-04 10:00:00", 150.0, 155.0, 148.0, 154.0, 1000000)
+    # # db.insert_stock_prices("AL", "2026-02-04 10:00:00", 150.0, 155.0, 148.0, 154.0, 1000000)
+    # # db.insert_stock_prices("AAP", "2026-02-04 10:00:00", 150.0, 155.0, 148.0, 154.0, 1000000)
+    # # rows = db.get_stock_prices("AAP")
+    # # for row in rows:
+    #     # print(row)
+    # # db.create_tables()
     db.close()
