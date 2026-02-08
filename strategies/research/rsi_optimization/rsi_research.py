@@ -74,6 +74,25 @@ def backtest_rsi_strategy(ticker, data, rsi_buy, rsi_sell, holding_days, stop_lo
                 
                 position = 0
                 position_entry_capital = 0
+                
+    # Close any remaining open position at end of backtest
+    if position > 0:
+        final_price = data['Close'].iloc[-1].values[0]
+        current_capital = position * final_price
+        pnl = current_capital - position_entry_capital
+        pnl_pct = (final_price - trades[-1]['entry_price']) / trades[-1]['entry_price']
+        
+        trades[-1].update({
+            'exit_date': data.index[-1],
+            'exit_price': float(final_price),
+            'exit_capital': float(current_capital),
+            'pnl': float(pnl),
+            'pnl_pct': float(pnl_pct),
+            'days_held': len(data) - trades[-1]['entry_index'],
+            'exit_reason': 'End of backtest period'  # NEW field
+        })
+        
+        position = 0
     
     # ✅ FIXED: Calculate metrics with safety checks
     completed_trades = [t for t in trades if 'pnl' in t]
