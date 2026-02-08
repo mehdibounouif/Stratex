@@ -93,6 +93,7 @@ class Database:
         self.cursor.execute(sql_news)
         self.conn.commit()
         print("✅ Tables created")
+
     def drop_table(self, table_name):
         self.ensure_connected()
         self.cursor.execute(
@@ -108,6 +109,7 @@ class Database:
             print(f"✅ Table '{table_name}' has been deleted.")
         except sqlite3.Error as e:
             print(f"❌ Failed to delete table '{table_name}': {e}")
+
     def delete_data_from_table(self, nameoftable, ticker):
         self.ensure_connected()
         sql = f"DELETE FROM {nameoftable} WHERE ticker = ?"
@@ -117,6 +119,7 @@ class Database:
             print(f"✅ Deleted all rows for ticker {ticker} from {nameoftable}")
         except sqlite3.Error as e:
             print(f"❌ Failed to delete data from {nameoftable}: {e}")
+
     def insert_stock_prices(self, ticker, date, open, high, low, close, volume):
         self.ensure_connected()
         self.check_if_the_table_exist("stock_prices")
@@ -130,6 +133,7 @@ class Database:
             print(f"✅ Stock price for {ticker} on {date} inserted")
         except sqlite3.Error as e:
             print(f"❌ Failed to insert stock for {ticker} on {date}: {e}")
+            
     def get_stock_prices(self, ticker, start_date=None, end_date=None):
         self.ensure_connected()
         sql = "SELECT * FROM stock_prices WHERE ticker = ?"
@@ -144,6 +148,7 @@ class Database:
         self.cursor.execute(sql, params)
         rows = self.cursor.fetchall()
         return rows
+
     def insert_fundamental(self, ticker, date, revenue, net_income, eps, pe_ratio):
         self.ensure_connected()
         self.check_if_the_table_exist("fundamentals")
@@ -157,6 +162,7 @@ class Database:
             print(f"✅ fundamental param for {ticker} on {date} inserted")
         except sqlite3.Error as e:
             print(f"❌ Failed to insert fundamental param for {ticker} on {date}: {e}")
+
     def get_fundamentals(self, ticker):
         self.ensure_connected()
         sql = "SELECT * FROM fundamentals WHERE ticker = ?"
@@ -164,6 +170,7 @@ class Database:
         self.cursor.execute(sql, params)
         rows = self.cursor.fetchall()
         return rows
+
     def insert_news(self, ticker, headline, summary, date, sentiment):
         self.ensure_connected()
         self.check_if_the_table_exist("news")
@@ -177,6 +184,7 @@ class Database:
             print(f"✅ news param for {ticker} on {date} inserted")
         except sqlite3.Error as e:
             print(f"❌ Failed to insert news param for {ticker} on {date}: {e}")
+
     def get_news(self, ticker, days=7):
         self.ensure_connected()
         start_date = (datetime.today() - timedelta(days=days)).strftime("%Y-%m-%d")
@@ -188,6 +196,7 @@ class Database:
         self.cursor.execute(sql, (ticker, start_date))
         rows = self.cursor.fetchall()
         return rows
+
     def close(self):
         if self.cursor:
             self.cursor.close()
@@ -196,20 +205,96 @@ class Database:
             self.conn.close()
             self.conn = None
         print("✅ Database connection closed.")
+
 db = Database()
+
 if __name__== "__main__":
     db.connect()
-    # db.check_if_the_table_exist("stock_prices")
-    # db.check_if_the_table_exist("news")
-    # db.check_if_the_table_exist("fundamentals")
-    # db.delete_data_from_table("stock_prices", "AAPL")
-    # db.delete_data_from_table("stock_prices", "AL")
-    # db.delete_data_from_table("stock_prices", "AAP")
-    # # db.insert_stock_prices("AAPL", "2026-02-04 10:00:00", 150.0, 155.0, 148.0, 154.0, 1000000)
-    # # db.insert_stock_prices("AL", "2026-02-04 10:00:00", 150.0, 155.0, 148.0, 154.0, 1000000)
-    # # db.insert_stock_prices("AAP", "2026-02-04 10:00:00", 150.0, 155.0, 148.0, 154.0, 1000000)
-    # # rows = db.get_stock_prices("AAP")
-    # # for row in rows:
-    #     # print(row)
-    # # db.create_tables()
+    try:
+      # Test 1: Create tables
+      print("\n[TEST 1] Creating tables...")
+      db.create_tables()
+    
+      # Test 2: Verify tables exist
+      print("\n[TEST 2] Checking if tables exist...")
+      db.check_if_the_table_exist("stock_prices")
+      db.check_if_the_table_exist("fundamentals")
+      db.check_if_the_table_exist("news")
+    
+      # Test 3: Insert stock prices
+      print("\n[TEST 3] Inserting stock price data...")
+      db.insert_stock_prices("AAPL", "2026-02-01", 150.0, 155.0, 148.0, 154.0, 1000000)
+      db.insert_stock_prices("AAPL", "2026-02-02", 154.0, 158.0, 153.0, 157.0, 1200000)
+      db.insert_stock_prices("GOOGL", "2026-02-01", 2800.0, 2850.0, 2790.0, 2840.0, 500000)
+             
+      # Test 4: Insert duplicate (should be ignored)
+      print("\n[TEST 4] Inserting duplicate (should be ignored)...")
+      db.insert_stock_prices("AAPL", "2026-02-01", 999.0, 999.0, 999.0, 999.0, 999999)
+      
+      # Test 5: Retrieve stock prices
+      print("\n[TEST 5] Retrieving stock prices for AAPL...")
+      rows = db.get_stock_prices("AAPL")
+      print(f"Found {len(rows)} records for AAPL:")
+      for row in rows:
+          print(f"  {row}")
+
+      # Test 6: Retrieve with date range
+      print("\n[TEST 6] Retrieving AAPL prices for specific date range...")
+      rows = db.get_stock_prices("AAPL", start_date="2026-02-01")
+      print(f"Found {len(rows)} records from 2026-02-02 onwards:")
+      for row in rows:
+          print(f"  {row}")
+
+      # Test 7: Insert fundamentals
+      print("\n[TEST 7] Inserting fundamental data...")
+      db.insert_fundamental("AAPL", "2026-Q1", 95000000000, 25000000000, 1.52, 28.5)
+      db.insert_fundamental("GOOGL", "2026-Q1", 85000000000, 20000000000, 1.35, 25.0)
+      
+      # Test 8: Retrieve fundamentals
+      print("\n[TEST 8] Retrieving fundamentals for AAPL...")
+      rows = db.get_fundamentals("AAPL")
+      print(f"Found {len(rows)} fundamental records:")
+      for row in rows:
+          print(f"  {row}")
+
+      # Test 9: Insert news
+      print("\n[TEST 9] Inserting news data...")
+      db.insert_news("AAPL", 
+                    "Apple Announces New Product", 
+                    "Apple unveiled its latest innovation...", 
+                    "2026-02-08", 
+                    0.85)
+      db.insert_news("AAPL", 
+                    "Apple Stock Reaches All-Time High", 
+                    "Shares hit record levels...", 
+                    "2026-02-07", 
+                    0.92)
+      
+      # Test 10: Retrieve news
+      print("\n[TEST 10] Retrieving news for AAPL (last 7 days)...")
+      rows = db.get_news("AAPL", days=7)
+      print(f"Found {len(rows)} news articles:")
+      for row in rows:
+          print(f"  {row}")
+    
+    # Test 11: Delete data
+    #  print("\n[TEST 11] Deleting GOOGL stock prices...")
+    #  db.delete_data_from_table("stock_prices", "GOOGL")
+    #  rows = db.get_stock_prices("GOOGL")
+    #  print(f"GOOGL records remaining: {len(rows)} (should be 0)")
+    #  
+    #  # Test 12: Drop and recreate table
+    #  print("\n[TEST 12] Dropping news table...")
+    #  db.drop_table("news")
+    #  print("Recreating tables...")
+    #  db.create_tables()
+    #  
+    #  print("\n" + "=" * 60)
+    #  print("✅ ALL TESTS COMPLETED SUCCESSFULLY!")
+    #  print("=" * 60)
+
+    except Exception as e:
+      print(f"\n❌ TEST FAILED: {e}")
+      import traceback
+      traceback.print_exc()    
     db.close()
