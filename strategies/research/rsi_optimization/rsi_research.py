@@ -156,39 +156,39 @@ def main():
     # Save results
     results_df = pd.DataFrame(results)
     results_df.to_csv('strategies/research/rsi_optimization/backtest_results.csv', index=False)
-    print("Results saved!")
+    print("Results saved to: strategies/research/rsi_optimization/backtest_results.csv")
     
     # Analyze results - only show strategies with trades
-    results_with_trades = results_df[results_df['total_trades'] > 0]
-    
-    if len(results_with_trades) > 0:
-        print("\n" + "="*80)
-        print("STRATEGIES THAT GENERATED TRADES:")
-        print("="*80)
-        
-        best = results_with_trades.sort_values('total_return', ascending=False)
-        
-        print(best[['ticker', 'rsi_buy', 'rsi_sell', 'holding_days', 'stop_loss', 
-                    'total_return', 'total_trades', 'win_rate', 'avg_win', 'avg_loss']].to_string())
-        
-        print("\n" + "="*80)
-        print("AVERAGE RETURN BY RSI THRESHOLD (only configs with trades):")
-        print("="*80)
-        avg_by_rsi = results_with_trades.groupby(['rsi_buy', 'rsi_sell'])['total_return'].mean()
-        print(avg_by_rsi)
-    else:
-        print("\n  WARNING: No strategies generated any trades!")
-        print("This might indicate:")
-        print("  1. RSI thresholds are too strict")
-        print("  2. The stocks didn't reach oversold/overbought levels")
-        print("  3. Data quality issues")
-    
-    # Overall statistics
-    print("\n" + "="*80)
-    print("OVERALL STATISTICS:")
-    print("="*80)
+#    results_with_trades = results_df[results_df['total_trades'] > 0]
+#    
+#    if len(results_with_trades) > 0:
+#        print("\n" + "="*80)
+#        print("STRATEGIES THAT GENERATED TRADES:")
+#        print("="*80)
+#        
+#        best = results_with_trades.sort_values('total_return', ascending=False)
+#        
+#        print(best[['ticker', 'rsi_buy', 'rsi_sell', 'holding_days', 'stop_loss', 
+#                    'total_return', 'total_trades', 'win_rate', 'avg_win', 'avg_loss']].to_string())
+#        
+#        print("\n" + "="*80)
+#        print("AVERAGE RETURN BY RSI THRESHOLD (only configs with trades):")
+#        print("="*80)
+#        avg_by_rsi = results_with_trades.groupby(['rsi_buy', 'rsi_sell'])['total_return'].mean()
+#        print(avg_by_rsi)
+#    else:
+#        print("\n  WARNING: No strategies generated any trades!")
+#        print("This might indicate:")
+#        print("  1. RSI thresholds are too strict")
+#        print("  2. The stocks didn't reach oversold/overbought levels")
+#        print("  3. Data quality issues")
+#    
+#    # Overall statistics
+#    print("\n" + "="*80)
+#    print("OVERALL STATISTICS:")
+#    print("="*80)
     avg_by_rsi_all = results_df.groupby(['rsi_buy', 'rsi_sell'])['total_return'].mean()
-    print(avg_by_rsi_all)
+#    print(avg_by_rsi_all)
     
     # Plot
     plt.figure(figsize=(12, 6))
