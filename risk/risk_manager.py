@@ -1,4 +1,8 @@
 from config import RiskConfig
+from logger import get_logger, setup_logging
+
+setup_logging()
+logging = get_logger("risk.risk_manager")
 
 class RiskManager:
     def __init__(self):
@@ -6,7 +10,7 @@ class RiskManager:
         self.current_portfolio_value = 10000
         self.current_cach = 1000
         self.num_positions = 20
-        print("Using test risk manager (Message for B3aybach)")
+        logging.info("Using test risk manager (Message for B3aybach)")
 
     def check_position_size(self, size):
         """Check if position size is limited"""
@@ -22,7 +26,7 @@ class RiskManager:
         return True, "cash reserve Ok"
 
     def approve_trade(self, trade):
-        print(f"\nReviewing trade: {trade['ticker']}")
+        logging.info(f"\nReviewing trade: {trade['ticker']}")
         checks = {}
         if trade['action'] == 'BUY':
             trade_value = trade.get('quantity', 0) * trade.get('currect_price', 0)
@@ -31,29 +35,29 @@ class RiskManager:
             """check position size"""
             passed, msg = self.check_position_size(trade_value)
             checks['position_size'] = passed
-            print(f"{msg}")
+            logging.info(f"{msg}")
 
             """check cash reserve"""
             passed, msg = self.check_cash_reserve(trade_value)
             checks['cash_reserve'] = passed
-            print(f"{msg}")
+            logging.info(f"{msg}")
 
             """check max position"""
             if self.num_positions >= self.config.MAX_TOTAL_POSITIONS:
                 checks['max_position'] = False
-                print(f"{self.num_positions} is too much, Max positions is: {self.config.MAX_TOTAL_POSITIONS}")
+                logging.warning(f"{self.num_positions} is too much, Max positions is: {self.config.MAX_TOTAL_POSITIONS}")
             else:
                 checks['max_position'] = True
-                print(f"{self.num_positions} is good, Max positions is: {self.config.MAX_TOTAL_POSITIONS}")
+                logging.info(f"{self.num_positions} is good, Max positions is: {self.config.MAX_TOTAL_POSITIONS}")
 
         else: # sell or hold b3aybach logic
             checks = {'position_size': True, 'cash_reserve': True, 'max_positions': True}
-            print("SELL/HOLD order - checks passed")
+            logging.info("SELL/HOLD order - checks passed")
         aproved = all(checks.values())
         if aproved:
-            print("trade APPROVED")
+            logging.info("trade APPROVED")
         else:
-            print("Trade REJECTED")
+            logging.info("Trade REJECTED")
 
         return {
             'trade': trade,
@@ -64,7 +68,7 @@ class RiskManager:
 risk_manager = RiskManager()
 
 if __name__ == "__main__":
-    print("Testing risk manager...")
+    logging.info("Testing risk manager...")
     test_trade = {
         'ticker': 'AAPL',
         'action': 'BUY',
@@ -73,4 +77,4 @@ if __name__ == "__main__":
     }
 
     result = risk_manager.approve_trade(test_trade)
-    print(f"\nResult: {result}")
+    logging.info(f"Result: {result}")

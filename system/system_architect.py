@@ -3,6 +3,10 @@ from config import BaseConfig, TradingConfig, RiskConfig
 from data.data_enginner import data_access
 from strategies.strategy_researcher import strategy_engine
 from risk.risk_manager import risk_manager
+from logger import setup_logging, get_logger
+
+setup_logging()
+logging = get_logger('system.system_architect')
 
 class TradingSystem:
     def __init__(self):
@@ -13,34 +17,34 @@ class TradingSystem:
         self.config = TradingConfig()
         self.initialized = False
 
-        print("TRADING SYSTEM INITIALIZED")
-        print(f"Environment: {BaseConfig.ENVIRONMENT}")
-        print(f"Debug Mode: {BaseConfig.DEBUG}")
-        print(f"Watchlist: {len(self.config.DEFAULT_WATCHLIST)} stocks\n")
+        logging.info("TRADING SYSTEM INITIALIZED")
+        logging.info(f"Environment: {BaseConfig.ENVIRONMENT}")
+        logging.info(f"Debug Mode: {BaseConfig.DEBUG}")
+        logging.info(f"Watchlist: {len(self.config.DEFAULT_WATCHLIST)} stocks\n")
 
     def analyze_single_stock(self, ticker, data=None):
         if data is None:
             data = datetime.now().strftime("%Y-%m-%d")
 
-        print(f"\nANALYZING: {ticker} on {data}")
+        logging.info(f"\nANALYZING: {ticker} on {data}")
 
-        print(f"Fetching data...")
+        logging.info(f"Fetching data...")
         price_data = self.data.get_price_history(ticker, days=90)
         if price_data is None or price_data.empty:
-            print(f"No data available for {ticker}")
+            logging.error(f"No data available for {ticker}")
             return None
         
-        print("Running strategy analysis...")
+        logging.info("Running strategy analysis...")
         signal = self.strategy.analyze(ticker, price_data)
         if signal is None:
-            print(f"Strategy analysis faild for {ticker}")
+            logging.error(f"Strategy analysis faild for {ticker}")
           
-        print(f"Signal : {signal['action']}")
-        print(f"Confidence : {signal['confidence']:.0%}")
-        print(f"Reasoning : {signal['reasoning']}")
+        logging.info(f"Signal : {signal['action']}")
+        logging.info(f"Confidence : {signal['confidence']:.0%}")
+        logging.info(f"Reasoning : {signal['reasoning']}")
 
         if signal['action'] in ['BUY', 'SELL']:
-            print("\nRisk management review...")
+            logging.info("\nRisk management review...")
             
             if signal['action'] == 'BUY':
               position_size = 0.05
@@ -76,7 +80,7 @@ class TradingSystem:
                   }
             else: # for sell
                # test doesn't track positions, skip sell for now
-               print("SELL signal (skiping)")
+               logging.info("SELL signal (skiping)")
                return {
                    'ticker': ticker,
                    'action': 'HOLD',
@@ -84,7 +88,7 @@ class TradingSystem:
                    'reason': 'Position tracking not implemented'
                }
         else: # for HOLD
-            print("\nNo action (HOLD signal)")
+            logging.info("No action (HOLD signal)")
             return {
                 'ticker': ticker,
                 'action': 'HOLD',
@@ -92,7 +96,7 @@ class TradingSystem:
                 'signal': signal
             }
     def scan_watchlist(self):
-        print(f"\nSCANNING WATCHLIST ({len(self.config.DEFAULT_WATCHLIST)}) Stocks.")
+        logging.info(f"SCANNING WATCHLIST ({len(self.config.DEFAULT_WATCHLIST)}) Stocks.")
         results = []
         
         for ticker in self.config.DEFAULT_WATCHLIST:
@@ -101,25 +105,25 @@ class TradingSystem:
                 if decision:
                     results.append(decision)
             except Exception as e:
-                print(f"Error analysing {ticker}: {e}")
+                logging.info(f"Error analysing {ticker}: {e}")
                 continue
         buy_signals = [r for r in results if r['action'] == 'BUY' and r['status'] == 'APPROVED']
         hold_signals = [r for r in results if r['action'] == 'HOLD']
 
-        print("\nSCAN SUMMARY:")
-        print(f"Total analyzed: {len(results)}")
-        print(f"BUY signals (approved): {len(buy_signals)}")
-        print(f"HOLD signals: {len(hold_signals)}")
+        logging.info("\nSCAN SUMMARY:")
+        logging.info(f"Total analyzed: {len(results)}")
+        logging.info(f"BUY signals (approved): {len(buy_signals)}")
+        logging.info(f"HOLD signals: {len(hold_signals)}")
 
         if buy_signals:
-            print("\n APPROVED BUY OPPORTUNITIES:")
+            logging.info("APPROVED BUY OPPORTUNITIES:")
             for signal in buy_signals:
-                print(f" - {signal['ticker']}: {signal['quantity']} shares ${signal['price']:.2f}\n")
+                logging.info(f" - {signal['ticker']}: {signal['quantity']} shares ${signal['price']:.2f}\n")
         return results
     
     def run_daily_analysis(self):
-        print(f"#{'DAILY TRADING ANALYSIS':^68}#")
-        print(f"#{'Date: ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S'):^68}#")
+        logging.info(f"#{'DAILY TRADING ANALYSIS':^68}#")
+        logging.info(f"#{'Date: ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S'):^68}#")
 
         results = self.scan_watchlist()
         return results
@@ -127,15 +131,15 @@ class TradingSystem:
 trading_system = TradingSystem()
 
 if __name__ == "__main__":
-    print("Testing Trading System...\n")
+    logging.info("Testing Trading System...\n")
     
     # Test 1: Analyze single stock
-    print("TEST 1: Single Stock Analysis\n")
+    logging.info("TEST 1: Single Stock Analysis\n")
     result = trading_system.analyze_single_stock('AAPL')
-    print(f"\nResult: {result}\n")
+    logging.info(f"\nResult: {result}\n")
     
     # Test 2: Scan first 3 stocks from watchlist (to save time)
-    print("TEST 2: Watchlist Scan (first 3 stocks)\n")
+    logging.info("TEST 2: Watchlist Scan (first 3 stocks)\n")
     trading_system.config.DEFAULT_WATCHLIST = ['AAPL', 'MSFT', 'NVDA']  # Just 3 for testing
     results = trading_system.scan_watchlist()
     

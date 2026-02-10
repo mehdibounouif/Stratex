@@ -3,6 +3,8 @@ import os
 from logging.handlers import RotatingFileHandler
 from config import BaseConfig
 
+# Global flag to prevent multiple initialization
+_logging_initialized = False
 def setup_logging():
     """
     Configure comprehensive logging system with multiple log files.
@@ -18,7 +20,13 @@ def setup_logging():
     - Silences noisy third-party libraries
     - Creates log directory if it doesn't exist
     """
+
+    global _logging_initialized
     
+    # Prevent multiple initialization
+    if _logging_initialized:
+        logging.warning("Logging already initialized, skipping...")
+        return 
     # Ensure log directory exists
     os.makedirs(BaseConfig.LOG_DIR, exist_ok=True)
     
@@ -65,10 +73,21 @@ def setup_logging():
     trading_handler.setFormatter(detailed_formatter)
     trading_logger.addHandler(trading_handler)
     
-    # Trading Logger (trades only)
+    # Strategies Logger (trades only)
     trading_logger = logging.getLogger('strategies')
     trading_handler = RotatingFileHandler(
         BaseConfig.STRATEGIES_LOG,
+        maxBytes=BaseConfig.LOG_MAX_BYTES,
+        backupCount=BaseConfig.LOG_BACKUP_COUNT
+    )
+    trading_handler.setLevel(logging.INFO)
+    trading_handler.setFormatter(detailed_formatter)
+    trading_logger.addHandler(trading_handler)
+    
+    # Risk Logger (trades only)
+    trading_logger = logging.getLogger('risk')
+    trading_handler = RotatingFileHandler(
+        BaseConfig.RISK_LOG,
         maxBytes=BaseConfig.LOG_MAX_BYTES,
         backupCount=BaseConfig.LOG_BACKUP_COUNT
     )
@@ -105,7 +124,8 @@ def setup_logging():
     logging.getLogger('peewee').setLevel(logging.WARNING)
     logging.getLogger('urllib3').setLevel(req_level)
     logging.getLogger('requests').setLevel(req_level)
-    
+
+    _logging_initialized = True 
     # ===== LOG INITIALIZATION COMPLETE =====
     logging.info("=" * 60)
     logging.info(f"Logging system initialized")
@@ -116,6 +136,7 @@ def setup_logging():
     logging.info(f"Error Log: {BaseConfig.ERROR_LOG}")
     logging.info(f"Data Log: {BaseConfig.DATA_LOG}")
     logging.info(f"Strategies Log: {BaseConfig.STRATEGIES_LOG}")
+    logging.info(f"Risk Log: {BaseConfig.RISK_LOG}")
     logging.info("=" * 60)
 
 

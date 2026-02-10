@@ -24,6 +24,7 @@ class BaseConfig:
     ERROR_LOG = os.path.join(LOG_DIR, 'errors.log')       # Errors only
     DATA_LOG = os.path.join(LOG_DIR, 'data_fetch.log')    # Data fetching operations
     STRATEGIES_LOG = os.path.join(LOG_DIR, 'strategies.log')    # strategies operations
+    RISK_LOG = os.path.join(LOG_DIR, 'risk.log')                # risk management operations
     
     # Log rotation settings
     LOG_MAX_BYTES = 10 * 1024 * 1024  # 10MB per file

@@ -306,18 +306,18 @@ class PositionTracker:
             print("Error while saving cash:")
             print(e)
     def _record_history(self):
-#    """
-#    Record a snapshot of the current portfolio state.
-#
-#    Behavior
-#    --------
-#    - Appends portfolio metrics to portfolio_history.csv
-#    - Used to build equity curves and performance analytics
-#
-#    Notes
-#    -----
-#    Stores portfolio STATE, not individual trades.
-#    """
+        """
+        Record a snapshot of the current portfolio state.
+
+        Behavior
+        --------
+        - Appends portfolio metrics to portfolio_history.csv
+        - Used to build equity curves and performance analytics
+
+        Notes
+        -----
+        Stores portfolio STATE, not individual trades.
+        """
         try:
             directory = os.path.dirname(self.history_file)
             os.makedirs(directory, exist_ok=True)
@@ -345,14 +345,18 @@ class PositionTracker:
         except Exception as e:
             print("Error while recording portfolio history:")
             print(e)
+
+    def _save_positions(self):
+        pass
     def display_positions(self):
-#    """
-#    Print a formatted, human-readable view of current positions.
-#    Behavior
-#    --------
-#    - Displays all positions in a table
-#    - Shows entry price, current price, and unrealized P&L
-#    - Prints portfolio summary below the table
+        """
+        Print a formatted, human-readable view of current positions.
+        Behavior
+        --------
+        - Displays all positions in a table
+        - Shows entry price, current price, and unrealized P&L
+        - Prints portfolio summary below the table
+        """
         if not self.positions:
             print("No open positions.")
             return
