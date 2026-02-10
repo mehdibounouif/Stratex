@@ -5,10 +5,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../'))
-sys.path.append(project_root)
+from logger import setup_logging, get_logger
+#project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../'))
+#sys.path.append(project_root)
 
 from data.data_enginner import data_access
+
+setup_logging()
+logging = get_logger(__name__)
 
 def calculate_rsi(prices, period=14):
     """Calculate Relative Strength Index (RSI)."""
@@ -142,7 +146,7 @@ def main():
     stop_losses = [0.03, 0.05, 0.07]
     
     for ticker in tickers:
-        print(f"Testing {ticker}...")
+        logging.info(f"Testing {ticker}...")
         data = data_access.get_price_history(ticker, days=365)
         
         for rsi_buy, rsi_sell in rsi_thresholds:
@@ -156,39 +160,9 @@ def main():
     # Save results
     results_df = pd.DataFrame(results)
     results_df.to_csv('strategies/research/rsi_optimization/backtest_results.csv', index=False)
-    print("Results saved to: strategies/research/rsi_optimization/backtest_results.csv")
+    logging.info("Results saved to: strategies/research/rsi_optimization/backtest_results.csv")
     
-    # Analyze results - only show strategies with trades
-#    results_with_trades = results_df[results_df['total_trades'] > 0]
-#    
-#    if len(results_with_trades) > 0:
-#        print("\n" + "="*80)
-#        print("STRATEGIES THAT GENERATED TRADES:")
-#        print("="*80)
-#        
-#        best = results_with_trades.sort_values('total_return', ascending=False)
-#        
-#        print(best[['ticker', 'rsi_buy', 'rsi_sell', 'holding_days', 'stop_loss', 
-#                    'total_return', 'total_trades', 'win_rate', 'avg_win', 'avg_loss']].to_string())
-#        
-#        print("\n" + "="*80)
-#        print("AVERAGE RETURN BY RSI THRESHOLD (only configs with trades):")
-#        print("="*80)
-#        avg_by_rsi = results_with_trades.groupby(['rsi_buy', 'rsi_sell'])['total_return'].mean()
-#        print(avg_by_rsi)
-#    else:
-#        print("\n  WARNING: No strategies generated any trades!")
-#        print("This might indicate:")
-#        print("  1. RSI thresholds are too strict")
-#        print("  2. The stocks didn't reach oversold/overbought levels")
-#        print("  3. Data quality issues")
-#    
-#    # Overall statistics
-#    print("\n" + "="*80)
-#    print("OVERALL STATISTICS:")
-#    print("="*80)
     avg_by_rsi_all = results_df.groupby(['rsi_buy', 'rsi_sell'])['total_return'].mean()
-#    print(avg_by_rsi_all)
     
     # Plot
     plt.figure(figsize=(12, 6))
@@ -200,7 +174,7 @@ def main():
     plt.axhline(y=0, color='r', linestyle='--', alpha=0.5)  # Add zero line
     plt.grid(axis='y', alpha=0.3)
     plt.savefig('strategies/research/rsi_optimization/rsi_comparison.png')
-    print("\n✓ Chart saved to: strategies/research/rsi_optimization/rsi_comparison.png")
+    logging.info("✓ Chart saved to: strategies/research/rsi_optimization/rsi_comparison.png")
 
 if __name__ == "__main__":
     main()

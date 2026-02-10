@@ -19,7 +19,10 @@ import sqlite3
 from datetime import datetime, timedelta
 from config import BaseConfig
 import pandas as pd
+from logger import get_logger, setup_logging
 
+setup_logging()
+logging = get_logger('data.database')
 class Database:
     
     def __init__(self, db_path=None):
@@ -33,23 +36,24 @@ class Database:
         try:
             self.conn = sqlite3.connect(self.db_path)
             self.cursor = self.conn.cursor()
-            print(f"✅ Connected to database: {self.db_path}")
+            logging.info(f"✅ Connected to database: {self.db_path}")
             return True
         except sqlite3.Error as e:
-            print(f"❌ Error connecting to database: {e}")
+            logging.error(f"❌ Error connecting to database: {e}")
             self.conn = None
             self.cursor = None
             return False
     def ensure_connected(self):
         if self.conn is None or self.cursor is None:
-            raise RuntimeError("❌ Database is not connected. Call connect() first.")
+            logging.error("❌ Database is not connected. Call connect() first.")
+            raise
     def check_if_the_table_exist(self, nameoftable):
             self.ensure_connected()
             self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?;",
                                 (nameoftable,))
             result = self.cursor.fetchone()
-            if result: print(f"✅ Table {nameoftable} exists")
-            else: print(f"❌ Table {nameoftable} does NOT exist")
+            if result: logging.info(f"✅ Table {nameoftable} exists")
+            else: logging.error(f"❌ Table {nameoftable} does NOT exist")
     def create_tables(self):
         self.ensure_connected()
         sql_stock_prices="""
@@ -92,7 +96,7 @@ class Database:
         self.cursor.execute(sql_fundamental)
         self.cursor.execute(sql_news)
         self.conn.commit()
-        print("✅ Tables created")
+        logging.info("✅ Tables created")
 
     def drop_table(self, table_name):
         self.ensure_connected()
@@ -100,15 +104,15 @@ class Database:
         "SELECT name FROM sqlite_master WHERE type='table' AND name=?;",
         (table_name,))
         if self.cursor.fetchone() is None:
-            print(f"❌ Table '{table_name}' does not exist.")
+            logging.error(f"❌ Table '{table_name}' does not exist.")
             return
         sql = f"DROP TABLE {table_name};"
         try:
             self.cursor.execute(sql)
             self.conn.commit()
-            print(f"✅ Table '{table_name}' has been deleted.")
+            logging.info(f"✅ Table '{table_name}' has been deleted.")
         except sqlite3.Error as e:
-            print(f"❌ Failed to delete table '{table_name}': {e}")
+            logging.error(f"❌ Failed to delete table '{table_name}': {e}")
 
     def delete_data_from_table(self, nameoftable, ticker):
         self.ensure_connected()
@@ -116,9 +120,9 @@ class Database:
         try:
             self.cursor.execute(sql, (ticker,))
             self.conn.commit()
-            print(f"✅ Deleted all rows for ticker {ticker} from {nameoftable}")
+            logging.info(f"✅ Deleted all rows for ticker {ticker} from {nameoftable}")
         except sqlite3.Error as e:
-            print(f"❌ Failed to delete data from {nameoftable}: {e}")
+            logging.error(f"❌ Failed to delete data from {nameoftable}: {e}")
 
     def insert_stock_prices(self, ticker, date, open, high, low, close, volume):
         self.ensure_connected()
@@ -130,9 +134,9 @@ class Database:
         try:
             self.cursor.execute(sql, (ticker, date, open, high, low, close, volume))
             self.conn.commit()
-            print(f"✅ Stock price for {ticker} on {date} inserted")
+            logging.info(f"✅ Stock price for {ticker} on {date} inserted")
         except sqlite3.Error as e:
-            print(f"❌ Failed to insert stock for {ticker} on {date}: {e}")
+            logging.error(f"❌ Failed to insert stock for {ticker} on {date}: {e}")
             
     def get_stock_prices(self, ticker, start_date=None, end_date=None):
         self.ensure_connected()
@@ -159,9 +163,9 @@ class Database:
         try:
             self.cursor.execute(sql, (ticker, date, revenue, net_income, eps, pe_ratio))
             self.conn.commit()
-            print(f"✅ fundamental param for {ticker} on {date} inserted")
+            logging.info(f"✅ fundamental param for {ticker} on {date} inserted")
         except sqlite3.Error as e:
-            print(f"❌ Failed to insert fundamental param for {ticker} on {date}: {e}")
+            logging.error(f"❌ Failed to insert fundamental param for {ticker} on {date}: {e}")
 
     def get_fundamentals(self, ticker):
         self.ensure_connected()
@@ -181,9 +185,9 @@ class Database:
         try:
             self.cursor.execute(sql, (ticker, headline, summary, date, sentiment))
             self.conn.commit()
-            print(f"✅ news param for {ticker} on {date} inserted")
+            logging.info(f"✅ news param for {ticker} on {date} inserted")
         except sqlite3.Error as e:
-            print(f"❌ Failed to insert news param for {ticker} on {date}: {e}")
+            logging.error(f"❌ Failed to insert news param for {ticker} on {date}: {e}")
 
     def get_news(self, ticker, days=7):
         self.ensure_connected()
@@ -204,7 +208,7 @@ class Database:
         if self.conn:
             self.conn.close()
             self.conn = None
-        print("✅ Database connection closed.")
+        logging.info("✅ Database connection closed.")
 
 db = Database()
 
@@ -212,53 +216,53 @@ if __name__== "__main__":
     db.connect()
     try:
       # Test 1: Create tables
-      print("\n[TEST 1] Creating tables...")
+      logging.info("[TEST 1] Creating tables...")
       db.create_tables()
     
       # Test 2: Verify tables exist
-      print("\n[TEST 2] Checking if tables exist...")
+      logging.info("[TEST 2] Checking if tables exist...")
       db.check_if_the_table_exist("stock_prices")
       db.check_if_the_table_exist("fundamentals")
       db.check_if_the_table_exist("news")
     
       # Test 3: Insert stock prices
-      print("\n[TEST 3] Inserting stock price data...")
+      logging.info("[TEST 3] Inserting stock price data...")
       db.insert_stock_prices("AAPL", "2026-02-01", 150.0, 155.0, 148.0, 154.0, 1000000)
       db.insert_stock_prices("AAPL", "2026-02-02", 154.0, 158.0, 153.0, 157.0, 1200000)
       db.insert_stock_prices("GOOGL", "2026-02-01", 2800.0, 2850.0, 2790.0, 2840.0, 500000)
              
       # Test 4: Insert duplicate (should be ignored)
-      print("\n[TEST 4] Inserting duplicate (should be ignored)...")
+      logging.info("[TEST 4] Inserting duplicate (should be ignored)...")
       db.insert_stock_prices("AAPL", "2026-02-01", 999.0, 999.0, 999.0, 999.0, 999999)
       
       # Test 5: Retrieve stock prices
-      print("\n[TEST 5] Retrieving stock prices for AAPL...")
+      logging.info("[TEST 5] Retrieving stock prices for AAPL...")
       rows = db.get_stock_prices("AAPL")
-      print(f"Found {len(rows)} records for AAPL:")
+      logging.info(f"Found {len(rows)} records for AAPL:")
       for row in rows:
           print(f"  {row}")
 
       # Test 6: Retrieve with date range
-      print("\n[TEST 6] Retrieving AAPL prices for specific date range...")
+      logging.info("[TEST 6] Retrieving AAPL prices for specific date range...")
       rows = db.get_stock_prices("AAPL", start_date="2026-02-01")
-      print(f"Found {len(rows)} records from 2026-02-02 onwards:")
+      logging.info(f"Found {len(rows)} records from 2026-02-02 onwards:")
       for row in rows:
           print(f"  {row}")
 
       # Test 7: Insert fundamentals
-      print("\n[TEST 7] Inserting fundamental data...")
+      logging.info("[TEST 7] Inserting fundamental data...")
       db.insert_fundamental("AAPL", "2026-Q1", 95000000000, 25000000000, 1.52, 28.5)
       db.insert_fundamental("GOOGL", "2026-Q1", 85000000000, 20000000000, 1.35, 25.0)
       
       # Test 8: Retrieve fundamentals
-      print("\n[TEST 8] Retrieving fundamentals for AAPL...")
+      logging.info("[TEST 8] Retrieving fundamentals for AAPL...")
       rows = db.get_fundamentals("AAPL")
-      print(f"Found {len(rows)} fundamental records:")
+      logging.info(f"Found {len(rows)} fundamental records:")
       for row in rows:
           print(f"  {row}")
 
       # Test 9: Insert news
-      print("\n[TEST 9] Inserting news data...")
+      logging.info("[TEST 9] Inserting news data...")
       db.insert_news("AAPL", 
                     "Apple Announces New Product", 
                     "Apple unveiled its latest innovation...", 
@@ -271,11 +275,11 @@ if __name__== "__main__":
                     0.92)
       
       # Test 10: Retrieve news
-      print("\n[TEST 10] Retrieving news for AAPL (last 7 days)...")
+      logging.info("[TEST 10] Retrieving news for AAPL (last 7 days)...")
       rows = db.get_news("AAPL", days=7)
-      print(f"Found {len(rows)} news articles:")
+      logging.info(f"Found {len(rows)} news articles:")
       for row in rows:
-          print(f"  {row}")
+          logging.debug(f"  {row}")
     
     # Test 11: Delete data
     #  print("\n[TEST 11] Deleting GOOGL stock prices...")
@@ -294,7 +298,7 @@ if __name__== "__main__":
     #  print("=" * 60)
 
     except Exception as e:
-      print(f"\n❌ TEST FAILED: {e}")
+      logging.error(f"❌ TEST FAILED: {e}")
       import traceback
       traceback.print_exc()    
     db.close()
