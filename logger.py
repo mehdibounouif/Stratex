@@ -65,6 +65,17 @@ def setup_logging():
     trading_handler.setFormatter(detailed_formatter)
     trading_logger.addHandler(trading_handler)
     
+    # Trading Logger (trades only)
+    trading_logger = logging.getLogger('strategies')
+    trading_handler = RotatingFileHandler(
+        BaseConfig.STRATEGIES_LOG,
+        maxBytes=BaseConfig.LOG_MAX_BYTES,
+        backupCount=BaseConfig.LOG_BACKUP_COUNT
+    )
+    trading_handler.setLevel(logging.INFO)
+    trading_handler.setFormatter(detailed_formatter)
+    trading_logger.addHandler(trading_handler)
+    
     # Error Logger (errors only)
     error_handler = RotatingFileHandler(
         BaseConfig.ERROR_LOG,
@@ -104,6 +115,7 @@ def setup_logging():
     logging.info(f"Trade Log: {BaseConfig.TRADE_LOG}")
     logging.info(f"Error Log: {BaseConfig.ERROR_LOG}")
     logging.info(f"Data Log: {BaseConfig.DATA_LOG}")
+    logging.info(f"Strategies Log: {BaseConfig.STRATEGIES_LOG}")
     logging.info("=" * 60)
 
 

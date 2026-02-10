@@ -12,7 +12,7 @@ from logger import setup_logging, get_logger
 from data.data_enginner import data_access
 
 setup_logging()
-logging = get_logger(__name__)
+logging = get_logger('strategies.research.rsi_optimization.rsi_research')
 
 def calculate_rsi(prices, period=14):
     """Calculate Relative Strength Index (RSI)."""

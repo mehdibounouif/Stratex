@@ -1,11 +1,15 @@
 import pandas as pd
 import numpy as np
 from config import TradingConfig
+from logger import get_logger, setup_logging
+
+setup_logging()
+logging = get_logger("strategies.strategy_researcher")
 
 class StrategyResearcher:
     def __init__(self):
         self.config = TradingConfig()
-        print("Using test strategy")
+        logging.info("Using test strategy")
     
     def calculate_rsi(self, prices, period=14):
         """Calculate RSI indicator"""
@@ -29,7 +33,8 @@ class StrategyResearcher:
         current_price = float(close.iloc[-1])
 
         if not 0 <= current_rsi <= 100:
-            raise ValueError(f"Invalid RSI value: {current_rsi}")
+            logging.error(f"Invalid RSI value: {current_rsi}")
+            raise
         if current_rsi < 30:
             signal = 'BUY'
             confidence = 0.65
@@ -60,7 +65,7 @@ strategy_engine = StrategyResearcher()
 
 if __name__ == "__main__":
     from data.data_enginner import data_access
-    print("Testing Stratgy...")
+    logging.info("Testing Stratgy...")
     data = data_access.get_price_history('NVDA', days=90)
     signal = strategy_engine.analyze('NVDA', data)
-    print(f"\n Signal: {signal}")
+    logging.info(f"Signal: {signal}")
