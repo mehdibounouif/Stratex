@@ -1,0 +1,6 @@
+{
+  "ticker": "AAPL",
+  "action": "SELL",
+  "signal_type": "RSI_OVERBOUGHT",
+  "confidence": 0.65,
+  "current_price": 

@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime
+from data.data_enginner import data_access
 import json
 import os
 
@@ -71,6 +72,12 @@ class RSIStrategy:
         # Get current values
         current_rsi = price_data['RSI'].iloc[-1]
         current_price = price_data['Close'].iloc[-1]
+
+        # Convert to Python floats if needed
+        if hasattr(current_rsi, "item"):
+            current_rsi = current_rsi.item()
+        if hasattr(current_price, "item"):
+            current_price = current_price.item()
         
         # Check if RSI is valid
         if pd.isna(current_rsi):
@@ -175,27 +182,49 @@ class RSIStrategy:
             'strategy': self.name,
             'timestamp': datetime.now().isoformat()
         }
-        
+
     def save_signal(self, signal, output_dir='strategies/signals'):
         """
         Save signal to JSON file
-        
+
         Args:
             signal: Signal dictionary
             output_dir: Directory to save signals
         """
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # Create filename with timestamp
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"{signal['ticker']}_{signal['action']}_{timestamp}.json"
         filepath = os.path.join(output_dir, filename)
-        
+
+        print(type(signal["current_price"]))
+        print(signal["current_price"])
+
         # Save
         with open(filepath, 'w') as f:
             json.dump(signal, f, indent=2)
-        
+
         print(f"✅ Signal saved: {filepath}")
-    
+
     def __str__(self):
         return f"RSIStrategy(buy={self.rsi_buy}, sell={self.rsi_sell}, hold={self.holding_days}d, stop={self.stop_loss:.0%})"
+    
+
+rsi_strategy = RSIStrategy(rsi_buy=25,rsi_sell=75,holding_days=5,stop_loss=0.05)
+
+if __name__ == '__main__':
+    # Test on AAPL
+    print("Testing RSI Strategy...")
+    print(rsi_strategy)
+
+    data = data_access.get_price_history('AAPL', days=90)
+    signal = rsi_strategy.generate_signal('AAPL', data)
+
+    print(f"\nSignal for AAPL:")
+    print(f"Action: {signal['action']}")
+    print(f"Confidence: {signal['confidence']:.0%}")
+    print(f"Reasoning: {signal['reasoning']}")
+
+    # Save signal
+    rsi_strategy.save_signal(signal)
