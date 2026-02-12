@@ -49,3 +49,44 @@ class RSIStrategy:
         rsi = 100 - (100 / (1 + rs))
         
         return rsi
+
+
+    def generate_signal(self, ticker, price_data):
+        """
+        Generate trading signal for a stock
+        
+        Args:
+            ticker: Stock symbol
+            price_data: DataFrame with OHLCV data
+        
+        Returns:
+            dict with signal information
+        """
+        if price_data is None or len(price_data) < 20:
+            return self._no_signal(ticker, "Insufficient data")
+        
+        # Calculate RSI
+        price_data['RSI'] = self.calculate_rsi(price_data['Close'])
+        
+        # Get current values
+        current_rsi = price_data['RSI'].iloc[-1]
+        current_price = price_data['Close'].iloc[-1]
+        
+        # Check if RSI is valid
+        if pd.isna(current_rsi):
+            return self._no_signal(ticker, "RSI calculation failed")
+        
+        # Generate signal
+        if current_rsi < self.rsi_buy:
+            # OVERSOLD - BUY signal
+            signal = self._buy_signal(ticker, current_price, current_rsi, price_data)
+        
+        elif current_rsi > self.rsi_sell:
+            # OVERBOUGHT - SELL signal
+            signal = self._sell_signal(ticker, current_price, current_rsi)
+        
+        else:
+            # NEUTRAL - HOLD
+            signal = self._hold_signal(ticker, current_price, current_rsi)
+        
+        return signal
