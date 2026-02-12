@@ -1,0 +1,11 @@
+{
+  "ticker": "NVDA",
+  "action": "HOLD",
+  "signal_type": "RSI_NEUTRAL",
+  "confidence": 0.4,
+  "current_price": 190.05,
+  "rsi": 55.0,
+  "reasoning": "RSI at 55.0 in neutral zone. Wait for clearer signal.",
+  "strategy": "RSI Mean Reversion",
+  "timestamp": "2026-02-12T18:52:17.821142"
+}

@@ -4,7 +4,10 @@ from datetime import datetime
 from data.data_enginner import data_access
 import json
 import os
+from logger import setup_logging, get_logger
 
+setup_logging()
+logging = get_logger("strategies.rsi_strategy")
 
 class RSIStrategy:
     """
@@ -108,9 +111,6 @@ class RSIStrategy:
             support = float(support_data.min().min())
         else:
             support = float(support_data.min())
-
-        print(type(support))
-        print(support)
         
         # Calculate target (based on historical rebounds)
         target_pct = 0.10  # 10% target
@@ -210,7 +210,7 @@ class RSIStrategy:
         with open(filepath, 'w') as f:
             json.dump(signal, f, indent=2)
 
-        print(f"✅ Signal saved: {filepath}")
+        logging.info(f"✅ Signal saved: {filepath}")
 
     def __str__(self):
         return f"RSIStrategy(buy={self.rsi_buy}, sell={self.rsi_sell}, hold={self.holding_days}d, stop={self.stop_loss:.0%})"
@@ -220,16 +220,16 @@ rsi_strategy = RSIStrategy(rsi_buy=25,rsi_sell=75,holding_days=5,stop_loss=0.05)
 
 if __name__ == '__main__':
     # Test on AAPL
-    print("Testing RSI Strategy...")
-    print(rsi_strategy)
+    logging.info("Testing RSI Strategy...")
+    logging.info(rsi_strategy)
 
     data = data_access.get_price_history('AMZN', days=90)
     signal = rsi_strategy.generate_signal('AMZN', data)
 
-    print(f"\nSignal for AAPL:")
-    print(f"Action: {signal['action']}")
-    print(f"Confidence: {signal['confidence']:.0%}")
-    print(f"Reasoning: {signal['reasoning']}")
+    logging.info(f"\nSignal for AAPL:")
+    logging.info(f"Action: {signal['action']}")
+    logging.info(f"Confidence: {signal['confidence']:.0%}")
+    logging.info(f"Reasoning: {signal['reasoning']}")
 
     # Save signal
     rsi_strategy.save_signal(signal)

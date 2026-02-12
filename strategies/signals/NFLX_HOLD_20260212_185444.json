@@ -1,0 +1,9 @@
+{
+  "ticker": "NFLX",
+  "action": "HOLD",
+  "signal_type": "NO_SIGNAL",
+  "confidence": 0.0,
+  "reasoning": "Insufficient data",
+  "strategy": "RSI Mean Reversion",
+  "timestamp": "2026-02-12T18:54:44.466561"
+}
