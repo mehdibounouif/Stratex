@@ -175,3 +175,27 @@ class RSIStrategy:
             'strategy': self.name,
             'timestamp': datetime.now().isoformat()
         }
+        
+    def save_signal(self, signal, output_dir='strategies/signals'):
+        """
+        Save signal to JSON file
+        
+        Args:
+            signal: Signal dictionary
+            output_dir: Directory to save signals
+        """
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Create filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{signal['ticker']}_{signal['action']}_{timestamp}.json"
+        filepath = os.path.join(output_dir, filename)
+        
+        # Save
+        with open(filepath, 'w') as f:
+            json.dump(signal, f, indent=2)
+        
+        print(f"✅ Signal saved: {filepath}")
+    
+    def __str__(self):
+        return f"RSIStrategy(buy={self.rsi_buy}, sell={self.rsi_sell}, hold={self.holding_days}d, stop={self.stop_loss:.0%})"
