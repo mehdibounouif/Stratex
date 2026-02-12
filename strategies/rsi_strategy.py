@@ -28,3 +28,24 @@ class RSIStrategy:
         self.holding_days = holding_days
         self.stop_loss = stop_loss
         self.name = "RSI Mean Reversion"
+    
+
+    def calculate_rsi(self, prices, period=14):
+        """
+        Calculate RSI indicator
+        
+        Args:
+            prices: Series of closing prices
+            period: RSI period (default: 14)
+        
+        Returns:
+            Series of RSI values
+        """
+        delta = prices.diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+        
+        return rsi
