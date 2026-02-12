@@ -129,3 +129,36 @@ class RSIStrategy:
             'strategy': self.name,
             'timestamp': datetime.now().isoformat()
     }
+
+
+    def _sell_signal(self, ticker, price, rsi):
+        """Create SELL signal"""
+        confidence = 0.65
+        
+        return {
+            'ticker': ticker,
+            'action': 'SELL',
+            'signal_type': 'RSI_OVERBOUGHT',
+            'confidence': confidence,
+            'current_price': round(price, 2),
+            'rsi': round(rsi, 1),
+            'reasoning': f"RSI at {rsi:.1f} indicates overbought condition. "
+                        f"Take profits before reversal.",
+            'strategy': self.name,
+            'timestamp': datetime.now().isoformat()
+        }
+    
+    def _hold_signal(self, ticker, price, rsi):
+        """Create HOLD signal"""
+        return {
+            'ticker': ticker,
+            'action': 'HOLD',
+            'signal_type': 'RSI_NEUTRAL',
+            'confidence': 0.40,
+            'current_price': round(price, 2),
+            'rsi': round(rsi, 1),
+            'reasoning': f"RSI at {rsi:.1f} in neutral zone. "
+                        f"Wait for clearer signal.",
+            'strategy': self.name,
+            'timestamp': datetime.now().isoformat()
+        }
