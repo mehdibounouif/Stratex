@@ -102,7 +102,15 @@ class RSIStrategy:
     def _buy_signal(self, ticker, price, rsi, price_data):
         """Create BUY signal"""
         # Calculate support level (recent low)
-        support = price_data['Low'].iloc[-20:].min()
+        support_data = price_data['Low'].iloc[-20:]
+
+        if isinstance(support_data, pd.DataFrame):
+            support = float(support_data.min().min())
+        else:
+            support = float(support_data.min())
+
+        print(type(support))
+        print(support)
         
         # Calculate target (based on historical rebounds)
         target_pct = 0.10  # 10% target
@@ -198,9 +206,6 @@ class RSIStrategy:
         filename = f"{signal['ticker']}_{signal['action']}_{timestamp}.json"
         filepath = os.path.join(output_dir, filename)
 
-        print(type(signal["current_price"]))
-        print(signal["current_price"])
-
         # Save
         with open(filepath, 'w') as f:
             json.dump(signal, f, indent=2)
@@ -218,8 +223,8 @@ if __name__ == '__main__':
     print("Testing RSI Strategy...")
     print(rsi_strategy)
 
-    data = data_access.get_price_history('AAPL', days=90)
-    signal = rsi_strategy.generate_signal('AAPL', data)
+    data = data_access.get_price_history('AMZN', days=90)
+    signal = rsi_strategy.generate_signal('AMZN', data)
 
     print(f"\nSignal for AAPL:")
     print(f"Action: {signal['action']}")

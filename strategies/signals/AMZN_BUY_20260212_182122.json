@@ -1,0 +1,15 @@
+{
+  "ticker": "AMZN",
+  "action": "BUY",
+  "signal_type": "RSI_OVERSOLD",
+  "confidence": 0.7,
+  "current_price": 204.08,
+  "target_price": 224.49,
+  "stop_loss": 193.88,
+  "rsi": 24.7,
+  "support_level": 200.31,
+  "holding_period": 5,
+  "reasoning": "RSI at 24.7 indicates oversold condition. Historical analysis shows 70% probability of rebound. Support at $200.31.",
+  "strategy": "RSI Mean Reversion",
+  "timestamp": "2026-02-12T18:21:22.088053"
+}
