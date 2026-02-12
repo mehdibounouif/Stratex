@@ -134,7 +134,7 @@ class RSIStrategy:
     def _sell_signal(self, ticker, price, rsi):
         """Create SELL signal"""
         confidence = 0.65
-        
+
         return {
             'ticker': ticker,
             'action': 'SELL',
@@ -147,7 +147,7 @@ class RSIStrategy:
             'strategy': self.name,
             'timestamp': datetime.now().isoformat()
         }
-    
+
     def _hold_signal(self, ticker, price, rsi):
         """Create HOLD signal"""
         return {
@@ -159,6 +159,19 @@ class RSIStrategy:
             'rsi': round(rsi, 1),
             'reasoning': f"RSI at {rsi:.1f} in neutral zone. "
                         f"Wait for clearer signal.",
+            'strategy': self.name,
+            'timestamp': datetime.now().isoformat()
+        }
+    
+
+    def _no_signal(self, ticker, reason):
+        """Create NO SIGNAL response"""
+        return {
+            'ticker': ticker,
+            'action': 'HOLD',
+            'signal_type': 'NO_SIGNAL',
+            'confidence': 0.0,
+            'reasoning': reason,
             'strategy': self.name,
             'timestamp': datetime.now().isoformat()
         }
