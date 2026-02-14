@@ -145,23 +145,67 @@ class RSIStrategy:
             'timestamp': datetime.now().isoformat()
     }
 
+    def _sell_signal(self, ticker, price, rsi, price_data):
+        """Create enhanced SELL signal with resistance analysis"""
 
-    def _sell_signal(self, ticker, price, rsi):
-        """Create SELL signal"""
-        confidence = 0.65
+        # --- Resistance level (recent high) ---
+        resistance_data = price_data['High'].iloc[-20:]
+
+        if isinstance(resistance_data, pd.DataFrame):
+            resistance = float(resistance_data.max().max())
+        else:
+            resistance = float(resistance_data.max())
+ 
+        # --- Confidence based on how overbought ---
+        if rsi > 85:
+            confidence = 0.85   # Extremely overbought
+        elif rsi > 80:
+            confidence = 0.75
+        else:
+            confidence = 0.65
+
+        # --- Risk context vs resistance ---
+        distance_to_resistance = (resistance - price) / price
+
+        if distance_to_resistance < 0.02:
+            confidence += 0.05  # Near resistance → stronger sell
+
+        confidence = min(confidence, 0.95)  # Cap at 95%
 
         return {
             'ticker': ticker,
             'action': 'SELL',
             'signal_type': 'RSI_OVERBOUGHT',
-            'confidence': confidence,
+            'confidence': round(confidence, 2),
             'current_price': round(price, 2),
             'rsi': round(rsi, 1),
-            'reasoning': f"RSI at {rsi:.1f} indicates overbought condition. "
-                        f"Take profits before reversal.",
+            'resistance_level': round(resistance, 2),
+            'holding_period': self.holding_days,
+            'reasoning': (
+                f"RSI at {rsi:.1f} indicates overbought condition. "
+                f"Price approaching resistance at ${resistance:.2f}. "
+                f"Historical probability of pullback: {confidence:.0%}."
+            ),
             'strategy': self.name,
             'timestamp': datetime.now().isoformat()
         }
+
+#    def _sell_signal(self, ticker, price, rsi):
+#        """Create SELL signal"""
+#        confidence = 0.65
+#
+#        return {
+#            'ticker': ticker,
+#            'action': 'SELL',
+#            'signal_type': 'RSI_OVERBOUGHT',
+#            'confidence': confidence,
+#            'current_price': round(price, 2),
+#            'rsi': round(rsi, 1),
+#            'reasoning': f"RSI at {rsi:.1f} indicates overbought condition. "
+#                        f"Take profits before reversal.",
+#            'strategy': self.name,
+#            'timestamp': datetime.now().isoformat()
+#        }
 
     def _hold_signal(self, ticker, price, rsi):
         """Create HOLD signal"""
