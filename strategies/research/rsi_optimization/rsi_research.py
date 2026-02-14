@@ -25,6 +25,8 @@ def calculate_rsi(prices, period=14):
 
 def backtest_rsi_strategy(ticker, data, rsi_buy, rsi_sell, holding_days, stop_loss):
     """Backtest RSI strategy with cleaner capital tracking."""
+#    print(type(data['Close'].values()))
+#    sys.exit()
     data['RSI'] = calculate_rsi(data['Close'])
     
     INITIAL_CAPITAL = 10000
@@ -98,7 +100,7 @@ def backtest_rsi_strategy(ticker, data, rsi_buy, rsi_sell, holding_days, stop_lo
         
         position = 0
     
-    # ✅ FIXED: Calculate metrics with safety checks
+    # FIXED: Calculate metrics with safety checks
     completed_trades = [t for t in trades if 'pnl' in t]
     total_trades = len(completed_trades)
     
@@ -165,16 +167,16 @@ def main():
     avg_by_rsi_all = results_df.groupby(['rsi_buy', 'rsi_sell'])['total_return'].mean()
     
     # Plot
-    plt.figure(figsize=(12, 6))
-    plt.bar(range(len(avg_by_rsi_all)), avg_by_rsi_all.values)
-    plt.xticks(range(len(avg_by_rsi_all)), [f"{idx[0]}/{idx[1]}" for idx in avg_by_rsi_all.index])
-    plt.xlabel('RSI Threshold (Buy/Sell)')
-    plt.ylabel('Average Return')
-    plt.title('Average Return by RSI Threshold')
-    plt.axhline(y=0, color='r', linestyle='--', alpha=0.5)  # Add zero line
-    plt.grid(axis='y', alpha=0.3)
-    plt.savefig('strategies/research/rsi_optimization/rsi_comparison.png')
-    logging.info("✓ Chart saved to: strategies/research/rsi_optimization/rsi_comparison.png")
+#    plt.figure(figsize=(12, 6))
+#    plt.bar(range(len(avg_by_rsi_all)), avg_by_rsi_all.values)
+#    plt.xticks(range(len(avg_by_rsi_all)), [f"{idx[0]}/{idx[1]}" for idx in avg_by_rsi_all.index])
+#    plt.xlabel('RSI Threshold (Buy/Sell)')
+#    plt.ylabel('Average Return')
+#    plt.title('Average Return by RSI Threshold')
+#    plt.axhline(y=0, color='r', linestyle='--', alpha=0.5)  # Add zero line
+#    plt.grid(axis='y', alpha=0.3)
+#    plt.savefig('strategies/research/rsi_optimization/rsi_comparison.png')
+#    logging.info("✓ Chart saved to: strategies/research/rsi_optimization/rsi_comparison.png")
 
 if __name__ == "__main__":
     main()

@@ -267,8 +267,8 @@ if __name__ == '__main__':
     logging.info("Testing RSI Strategy...")
     logging.info(rsi_strategy)
 
-    data = data_access.get_price_history('AMZN', days=90)
-    signal = rsi_strategy.generate_signal('AMZN', data)
+    data = data_access.get_price_history('AMD', days=90)
+    signal = rsi_strategy.generate_signal('AMD', data)
 
     logging.info(f"\nSignal for AAPL:")
     logging.info(f"Action: {signal['action']}")
