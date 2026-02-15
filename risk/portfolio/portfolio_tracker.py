@@ -26,8 +26,11 @@ from datetime import datetime, timezone
 import os
 from logger import setup_logging, get_logger
 from decimal import Decimal
-from dataclasses import dataclass, asdict
-from typing import Dict, List, Optional
+from dataclasses import dataclass
+from typing import Dict, List
+import shutil
+
+
 @dataclass
 class Position:
     ticker: str
@@ -47,9 +50,13 @@ class Position:
             'unrealized_pnl': float(self.unrealized_pnl),
             'entry_date': self.entry_date
         }
+    
     @classmethod
-    def from_dict(cls, data: Dict) -> 'Position':
-        """Create from dict loaded from CSV."""
+    #this function returns a Position object from a dictionnary
+    def from_dict(cls, data: Dict):
+        """
+        Create from dict loaded from CSV.
+        """
         return cls(
             ticker=data['ticker'],
             quantity=Decimal(str(data['quantity'])),
@@ -58,8 +65,11 @@ class Position:
             unrealized_pnl=Decimal(str(data['unrealized_pnl'])),
             entry_date=data['entry_date']
         )
+    
     def copy(self):
-        """Create a deep copy of the position for rollback."""
+        """
+        Create a deep copy of the position for rollback.
+        """
         return Position(
             ticker=self.ticker,
             quantity=self.quantity,
@@ -78,7 +88,7 @@ class PositionTracker:
         if initial_capital is None:
             initial_capital = TradingConfig.INITIAL_CAPITAL
         self.initial_capital = Decimal(str(initial_capital))
-        log.info(f"Initial capital is set to: ${self.initial_capital}") 
+        log.debug(f"Initial capital is set to: ${self.initial_capital}") 
         self.cash = Decimal(str(initial_capital))
         self.positions: List[Position] = [] 
         self.total_realized_pnl = Decimal('0')
@@ -87,9 +97,9 @@ class PositionTracker:
         self.positions_file = 'risk/portfolio/current_positions.csv'
         self.history_file = 'risk/portfolio/portfolio_history.csv'
         self.cash_file = 'risk/portfolio/cash_balance.json'
-        self.trades_file = 'risk/portfolio/trade_history.csv'  # ✓ Fixed extension
+        self.trades_file = 'risk/portfolio/trade_history.csv'
 
-        # Load existing positions if available
+        # Load existing positions and cash
         self._load_positions()
         log.info(f"PositionTracker initialized with {len(self.positions)} positions and ${self.cash} cash")
 
@@ -103,7 +113,7 @@ class PositionTracker:
         Returns:
             bool: True if the position was successfully added, False otherwise.
         """
-        log.info(f"Attempting to add position: {ticker}, qty={quantity}, price=${entry_price}")
+        log.info(f"Attempting to add position: {ticker}, quantity={quantity}, price=${entry_price}")
         quantity = Decimal(str(quantity))
         entry_price = Decimal(str(entry_price))
         ticker = self._normalize_ticker(ticker)
@@ -142,7 +152,7 @@ class PositionTracker:
                 existing_position.quantity = new_quantity
                 existing_position.entry_price = average_price
                 existing_position.current_price = entry_price
-                log.info(f"Updated {ticker}: qty={new_quantity}, avg_price=${average_price:.2f}")
+                log.info(f"Updated {ticker}: quantity={new_quantity}, avg_price=${average_price:.2f}")
             else:
                 new_position = Position(
                       ticker=ticker,
@@ -162,9 +172,12 @@ class PositionTracker:
             
             self._save_cash()
             self._save_positions()
-            self._record_trade('BUY', ticker, float(quantity), float(entry_price))  # ✓ Fixed method name
+            self._record_trade('BUY', ticker, quantity, entry_price)
             self._record_history()
             
+            if not self.reconcile():
+                log.error(f"⚠️ Reconciliation failed after buying {ticker}")
+                raise RuntimeError("Accounting error detected - trading halted")
             log.info(f"✅ Successfully bought {quantity} shares of {ticker} at ${entry_price}")
             return True
             
@@ -203,7 +216,7 @@ class PositionTracker:
             df = pd.DataFrame([trade])
             file_exists = os.path.exists(self.trades_file)
             write_header = not file_exists or (os.path.getsize(self.trades_file) == 0)
-            
+            #if the file does nto exists pandas cerates automatically
             df.to_csv(self.trades_file, mode='a', header=write_header, index=False)
             log.info(f"📝 Recorded {action} trade: {quantity} of {ticker} at ${price:.2f}")
             
@@ -290,14 +303,17 @@ class PositionTracker:
             
             self._save_cash()
             self._save_positions()
-            self._record_trade('SELL', ticker, float(quantity_to_sell), float(selling_price), float(realized_pnl))
+            self._record_trade('SELL', ticker, quantity_to_sell, selling_price, realized_pnl)
             self._record_history()
-            
+            if not self.reconcile():
+                log.error(f"⚠️ Reconciliation failed after selling {ticker}")
+                raise RuntimeError("Accounting error detected - trading halted")
+    
             sell_info = {
                 'ticker': ticker,
-                'quantity_sold': float(quantity_to_sell),
-                'selling_price': float(selling_price),
-                'realized_pnl': float(realized_pnl)
+                'quantity_sold': quantity_to_sell,
+                'selling_price': selling_price,
+                'realized_pnl': realized_pnl
             }
             
             log.info(f"✅ Successfully sold {quantity_to_sell} shares of {ticker} at ${selling_price:.2f}")
@@ -416,14 +432,14 @@ class PositionTracker:
         return_pct = ((Decimal(str(total_value)) - self.initial_capital) / self.initial_capital) * 100 if self.initial_capital != 0 else Decimal('0')
         
         summary = {
-            'positions_value': float(positions_value),
-            'cash': float(cash),
-            'cash_pct': float(cash_pct),
-            'portfolio_value': float(total_value),
+            'positions_value': positions_value,
+            'cash': cash,
+            'cash_pct': cash_pct,
+            'portfolio_value': total_value,
             'total_positions': len(self.positions),
-            'total_unrealized_pnl': float(total_unrealized_pnl),
-            'total_realized_pnl': float(self.total_realized_pnl),
-            'return_pct': float(return_pct)
+            'total_unrealized_pnl': total_unrealized_pnl,
+            'total_realized_pnl': self.total_realized_pnl,
+            'return_pct': return_pct
         }
         
         log.debug(f"Portfolio summary: value=${summary['portfolio_value']:.2f}, return={summary['return_pct']:.2f}%")
@@ -507,6 +523,11 @@ class PositionTracker:
                 log.error(f"❌ Error loading cash file: {e}")
         else:
             log.info("No existing cash file found, using initial capital")
+        if self.positions and self.cash != self.initial_capital:
+            log.info("Verifying loaded portfolio data...")
+            if not self.reconcile():
+                log.error("⚠️ Loaded data failed reconciliation!")
+                log.error("Portfolio may be corrupted. Review backups.")
 
     def _save_cash(self):
         """
@@ -578,7 +599,8 @@ class PositionTracker:
             
             if self.positions:
                 position_data = [pos.to_dict() for pos in self.positions]
-                pd.DataFrame(position_data).to_csv(self.positions_file, index=False)
+                df = pd.DataFrame(position_data)
+                df.to_csv(self.positions_file, index=False)
                 log.debug(f"Saved {len(self.positions)} positions to {self.positions_file}")
             else:
                 empty_df = pd.DataFrame(columns=[
@@ -628,20 +650,44 @@ class PositionTracker:
         
         log.info("Displayed positions summary")
 
+    def reconcile(self):
+        """
+        Verify portfolio accounting is consistent.
+        Ensures: cash + positions_value = initial_capital + total_realized_pnl
+        Returns:
+        bool: True if reconciliation passes, False if discrepancy found
+        """
+        log.info("Running portfolio reconciliation")
+    
+        positions_value_at_entry = sum(
+        pos.quantity * pos.entry_price
+        for pos in self.positions
+        )
+        total_value = positions_value_at_entry + self.cash
+        expected = self.initial_capital + self.total_realized_pnl
+    
+        tolerance = Decimal('0.01')  # 1 cent tolerance
+        diff = abs(total_value - expected)
+    
+        if diff > tolerance:
+            log.error(f"❌ Reconciliation FAILED!")
+            log.error(f"   Current portfolio value: ${total_value:.2f}")
+            log.error(f"   Expected value: ${expected:.2f}")
+            log.error(f"   Discrepancy: ${diff:.2f}")
+            return False
+    
+        log.info(f"✅ Reconciliation passed (discrepancy: ${diff:.4f})")
+        return True
+    
     def backup(self, backup_dir='risk/portfolio/backups'):
         """
         Create timestamped backup of all portfolio files.
         Use this before major changes or at end of each trading day.
         """
-        import shutil
-    
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         backup_path = os.path.join(backup_dir, timestamp)
-    
         try:
             os.makedirs(backup_path, exist_ok=True)
-        
-        # Backup all files
             if os.path.exists(self.positions_file):
                 shutil.copy2(self.positions_file, os.path.join(backup_path, 'current_positions.csv'))
             if os.path.exists(self.cash_file):
@@ -660,40 +706,34 @@ class PositionTracker:
 position_tracker = PositionTracker()
 
 if __name__ == "__main__":
+    
     log.info("="*60)
     log.info("Starting PositionTracker demo")
     log.info("="*60)
     
     tracker = PositionTracker()
     
-    # Initial state
     print("\n📊 Initial State:")
     print(f"Positions: {tracker.get_all_positions()}")
     print(f"Cash: ${tracker.cash}")
 
-    # Buy shares
     print("\n💰 Buying shares...")
     tracker.add_position('AAPL', 5, 200.0)
     tracker.add_position('MSFT', 2, 380.0)
 
-    # Display after buying
     tracker.display_positions()
 
-    # Update market prices
     print("\n📈 Updating market prices...")
     tracker.update_prices({
         'AAPL': 210.5,
         'MSFT': 390.2
     })
 
-    # Display after price update
     tracker.display_positions()
 
-    # Sell some shares
     print("\n💸 Selling shares...")
     tracker.remove_position('AAPL', 3, 215.0)
     
-    # Final state
     tracker.display_positions()
-    
+    backup_path = tracker.backup()
     log.info("Demo completed")

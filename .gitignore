@@ -44,3 +44,6 @@ htmlcov/
 # Temporary
 tmp/
 temp/
+
+#risk branch do not touch -_-
+my_notes.txt
