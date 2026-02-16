@@ -22,7 +22,7 @@ from logger import setup_logging, get_logger
 from data.database import Database
 
 setup_logging()
-logger = get_logger('data.data_cleaner')
+logger = get_logger('data.data_cleaning')
 
 
 class DataCleaner:
