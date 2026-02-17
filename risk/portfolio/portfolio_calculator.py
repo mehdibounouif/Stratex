@@ -47,6 +47,16 @@ class PortfolioCalculator:
             Portfolio tracker instance providing positions,
             prices, and historical portfolio data.
         """
+        if tracker is None:
+            from risk.portfolio.portfolio_tracker import position_tracker
+            tracker = position_tracker
+        
+        self.tracker = tracker
+        
+        # Comprehensive sector mapping
+        self.sector_map = self._load_sector_map()
+        
+        logger.info("✅ PortfolioCalculator initialized")
         pass
     
     
