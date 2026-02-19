@@ -16,6 +16,6 @@ class TradingConfig:
     DEFAULT_STRATEGY = "rsi_mean_reversion"
 
     # TradingAgents
-    USE_TRADING_AGENT = True
+    USE_TRADING_AGENT = False
     TRADINGAGENTS_MODEL = 'gpt-4o-mini'
     TRADINGAGENTS_DEBATE_ROUNDS = 2
