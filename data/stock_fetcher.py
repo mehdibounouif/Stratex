@@ -97,27 +97,19 @@ class StockDataFetcher:
                     logger.warning(f"⚠️ No data returned for {ticker}")
                     return None
                 
-                # Reset index to make Date a column
+                # Reset index (Date becomes column)
                 df = df.reset_index()
-                
-                # Ensure column names are strings (yfinance sometimes returns tuples)
-                df.columns = [str(col).replace("('", "").replace("',)", "") if isinstance(col, tuple) else str(col) for col in df.columns]
-                
-                # Standardize column names
-                column_mapping = {
-                    'Date': 'Date',
-                    'Open': 'Open',
-                    'High': 'High',
-                    'Low': 'Low',
-                    'Close': 'Close',
-                    'Adj Close': 'Adj_Close',
-                    'Volume': 'Volume'
-                }
-                
-                # Rename columns to standard format
-                for old_name, new_name in column_mapping.items():
-                    if old_name in df.columns:
-                        df.rename(columns={old_name: new_name}, inplace=True)
+
+                # If MultiIndex (happens sometimes), flatten it properly
+                if isinstance(df.columns, pd.MultiIndex):
+                    df.columns = df.columns.get_level_values(0)
+
+                # Ensure clean string column names
+                df.columns = df.columns.astype(str)
+
+                # Keep only required columns in correct order
+                required_columns = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
+                df = df[required_columns]
                 
                 logger.info(f"✅ Downloaded {len(df)} records for {ticker}")
                 
