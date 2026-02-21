@@ -67,12 +67,28 @@ class StockDataFetcher:
                     logger.warning(f"⚠️ No data returned for {ticker}")
                     return None
                 
+<<<<<<< HEAD
                 # FIX: Clean up the DataFrame to have simple column names
                 df = self._clean_dataframe(df, ticker)
                 
                 if df is None:
                     logger.error(f"❌ Failed to clean DataFrame for {ticker}")
                     return None
+=======
+                # Reset index (Date becomes column)
+                df = df.reset_index()
+
+                # If MultiIndex (happens sometimes), flatten it properly
+                if isinstance(df.columns, pd.MultiIndex):
+                    df.columns = df.columns.get_level_values(0)
+
+                # Ensure clean string column names
+                df.columns = df.columns.astype(str)
+
+                # Keep only required columns in correct order
+                required_columns = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
+                df = df[required_columns]
+>>>>>>> 1292bdb05ef3e118767c232aa836860f66de6197
                 
                 logger.info(f"✅ Downloaded {len(df)} records for {ticker}")
                 

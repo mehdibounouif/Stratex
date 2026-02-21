@@ -200,6 +200,129 @@ class Database:
         self.cursor.execute(sql, (ticker, start_date))
         rows = self.cursor.fetchall()
         return rows
+    def delete_duplicate_news_records(self):
+        """
+        Removes news articles that have the exact same ticker, headline, and date.
+        Keeps only the record with the lowest (original) ID.
+        """
+        self.ensure_connected()
+
+        # This SQL logic finds duplicates and deletes the extra ones
+        sql = """
+        DELETE FROM news 
+        WHERE id NOT IN (
+            SELECT MIN(id) 
+            FROM news 
+            GROUP BY ticker, headline, date
+        )
+        """
+        try:
+            self.cursor.execute(sql)
+            count = self.cursor.rowcount # Number of rows actually deleted
+            self.conn.commit()
+            logging.info(f"✅ Cleaned news table: Removed {count} duplicates.")
+            return count
+        except sqlite3.Error as e:
+            logging.error(f"❌ Failed to delete duplicate news: {e}")
+            return 0
+    def get_all_stock_prices(self, ticker=None):
+        """
+        Fetches records in a dictionary format so Pandas can read it easily.
+        """
+        self.ensure_connected()
+        # Set row factory to return dictionaries instead of tuples
+        self.conn.row_factory = sqlite3.Row
+        cursor = self.conn.cursor()
+        
+        if ticker:
+            sql = "SELECT * FROM stock_prices WHERE ticker = ? ORDER BY date ASC"
+            cursor.execute(sql, (ticker,))
+        else:
+            sql = "SELECT * FROM stock_prices ORDER BY ticker, date ASC"
+            cursor.execute(sql)
+            
+        rows = [dict(row) for row in cursor.fetchall()]
+        # Reset row factory for other functions
+        self.conn.row_factory = None
+        return rows
+
+    def replace_stock_prices(self, ticker, cleaned_df):
+        """
+        Security: Atomic operation. Deletes old data and inserts new clean data.
+        """
+        self.ensure_connected()
+        try:
+            # We use a transaction (commit at the end) so we don't lose data if it fails
+            if ticker:
+                self.cursor.execute("DELETE FROM stock_prices WHERE ticker = ?", (ticker,))
+            else:
+                self.cursor.execute("DELETE FROM stock_prices")
+            
+            # Prepare data for bulk insertion - use to_records instead of to_dict for better performance
+            records = cleaned_df.to_records(index=False)
+            sql = """
+            INSERT INTO stock_prices(ticker, date, open, high, low, close, volume)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """
+            # Using executemany is 100x faster than a loop
+            self.cursor.executemany(sql, [(r['ticker'], r['date'], r['open'], r['high'], r['low'], r['close'], r['volume']) for r in records])
+            
+            self.conn.commit()
+            logging.info(f"✅ Successfully replaced data in database.")
+        except sqlite3.Error as e:
+            self.conn.rollback() # Undo the delete if the insert fails!
+            logging.error(f"❌ Failed to replace stock prices: {e}")
+        except Exception as e:
+            self.conn.rollback()
+            logging.error(f"❌ Unexpected error: {e}")
+
+    def delete_older_than(self, table_name, cutoff_date):
+        """
+        Used by remove_old_data() for maintenance.
+        """
+        self.ensure_connected()
+        # Security Note: Table names cannot be parameterized in SQL, 
+        # but we control the table_name input in the Cleaner.
+        sql = f"DELETE FROM {table_name} WHERE date < ?"
+        try:
+            self.cursor.execute(sql, (cutoff_date,))
+            count = self.cursor.rowcount
+            self.conn.commit()
+            return count
+        except sqlite3.Error as e:
+            logging.error(f"❌ Failed to delete old data: {e}")
+            return 0
+    
+    def vacuum_database(self):
+        self.ensure_connected()
+        try:
+            # VACUUM cannot run inside a transaction
+            self.conn.isolation_level = None
+            self.cursor.execute("VACUUM")
+            self.conn.isolation_level = "" # Reset to default
+            self.conn.commit()
+            logging.info("✅ Database vacuumed.")
+        except sqlite3.Error as e:
+            logging.error(f"❌ Vacuum failed: {e}")
+            self.conn.isolation_level = "" # Reset even on failure
+    
+    def execute_raw(self, sql):
+        """
+        Helper for executing raw SQL commands like VACUUM.
+        """
+        self.ensure_connected()
+        try:
+            # For commands like VACUUM that can't run in a transaction
+            if sql.upper().strip() == "VACUUM":
+                self.vacuum_database()
+                return True
+            else:
+                self.cursor.execute(sql)
+                self.conn.commit()
+                return True
+        except sqlite3.Error as e:
+            logging.error(f"❌ Execution failed: {e}")
+            return False
 
     def close(self):
         if self.cursor:
