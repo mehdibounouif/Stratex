@@ -604,13 +604,33 @@ class TradingSystem:
         filepath = os.path.join(self.report_dir, f"risk_{today}.json")
 
         try:
-            # Get risk metrics from calculator
+            # Get portfolio summary
+            portfolio_summary = self.tracker.get_portfolio_summary()
+            
+            # Get risk metrics from calculator (returns None if no positions)
             risk_report = self.calculator.generate_risk_report()
+            
+            # Handle empty portfolio case
+            if risk_report is None:
+                risk_report = {
+                    'portfolio_summary': {},
+                    'risk_metrics': {},
+                    'sector_breakdown': {},
+                    'position_concentration': {}
+                }
 
             # Build full report
             report = {
                 'date':          datetime.now().isoformat(),
-                'portfolio':     risk_report.get('portfolio_summary', {}),
+                'portfolio':     {
+                    'portfolio_value': float(portfolio_summary.get('portfolio_value', 0)),
+                    'cash':            float(portfolio_summary.get('cash', 0)),
+                    'cash_pct':        float(portfolio_summary.get('cash_pct', 0)),
+                    'positions':       int(portfolio_summary.get('total_positions', 0)),
+                    'unrealized_pnl':  float(portfolio_summary.get('total_unrealized_pnl', 0)),
+                    'realized_pnl':    float(portfolio_summary.get('total_realized_pnl', 0)),
+                    'return_pct':      float(portfolio_summary.get('return_pct', 0))
+                },
                 'risk_metrics':  risk_report.get('risk_metrics', {}),
                 'sector':        risk_report.get('sector_breakdown', {}),
                 'concentration': risk_report.get('position_concentration', {}),
@@ -632,6 +652,8 @@ class TradingSystem:
 
         except Exception as e:
             log.error(f"❌ Failed to save report: {e}")
+            import traceback
+            log.debug(traceback.format_exc())
             return None
 
     # ================================================================
