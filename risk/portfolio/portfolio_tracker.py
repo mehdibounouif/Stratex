@@ -88,7 +88,7 @@ class PositionTracker:
         if initial_capital is None:
             initial_capital = TradingConfig.INITIAL_CAPITAL
         self.initial_capital = Decimal(str(initial_capital))
-        log.debug(f"Initial capital is set to: ${self.initial_capital}") 
+        log.info(f"Initial capital is set to: ${self.initial_capital}") 
         self.cash = Decimal(str(initial_capital))
         self.positions: List[Position] = [] 
         self.total_realized_pnl = Decimal('0')
