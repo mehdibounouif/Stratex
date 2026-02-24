@@ -68,7 +68,7 @@ class DataEngineer:
         
         # Data cleaner
         try:
-            from data.data_cleaner import DataCleaner
+            from data.pipelines.data_cleaning import DataCleaner
             self.cleaner = DataCleaner(db=self.db)
             log.info("✅ Data cleaner loaded")
         except Exception as e:
