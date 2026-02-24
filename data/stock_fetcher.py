@@ -18,6 +18,7 @@ import yfinance as yf
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
+from data.pipelines.data_cleaning import DataCleaner
 from logger import setup_logging, get_logger
 
 setup_logging()
@@ -37,6 +38,7 @@ class StockDataFetcher:
         self.db = db
         self.max_retries = 3
         self.retry_delay = 2
+        self.cleaner = DataCleaner()
         
         logger.info(f"✅ StockDataFetcher initialized")
         logger.info(f"   Raw data path: {self.raw_data_path}")
@@ -67,41 +69,27 @@ class StockDataFetcher:
                     logger.warning(f"⚠️ No data returned for {ticker}")
                     return None
                 
-<<<<<<< HEAD
                 # FIX: Clean up the DataFrame to have simple column names
                 df = self._clean_dataframe(df, ticker)
-                
+
                 if df is None:
                     logger.error(f"❌ Failed to clean DataFrame for {ticker}")
                     return None
-=======
-                # Reset index (Date becomes column)
-                df = df.reset_index()
-
-                # If MultiIndex (happens sometimes), flatten it properly
-                if isinstance(df.columns, pd.MultiIndex):
-                    df.columns = df.columns.get_level_values(0)
-
-                # Ensure clean string column names
-                df.columns = df.columns.astype(str)
-
-                # Keep only required columns in correct order
-                required_columns = ['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
-                df = df[required_columns]
->>>>>>> 1292bdb05ef3e118767c232aa836860f66de6197
                 
+                df_clean = self.cleaner.clean_stock_prices(df, ticker)
+
                 logger.info(f"✅ Downloaded {len(df)} records for {ticker}")
                 
                 # Save to CSV file
-                self._save_to_csv(ticker, df, start_date, end_date)
+                self._save_to_csv(ticker, df_clean, start_date, end_date)
                 
                 # Save to database
                 if self.db:
-                    self._save_to_database(ticker, df)
+                    self._save_to_database(ticker, df_clean)
                 else:
                     logger.warning("⚠️ Database not connected. Skipping database save.")
                 
-                return df
+                return df_clean
                 
             except Exception as e:
                 logger.error(f"❌ Attempt {attempt}/{self.max_retries} failed for {ticker}: {e}")
