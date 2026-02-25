@@ -24,7 +24,7 @@ import yfinance as yf
 
 
 setup_logging()
-logger = get_logger('risk.portfolio.portfolio_calculator.py')
+logger = get_logger('risk.portfolio.portfolio_calculator')
 
 class PortfolioCalculator:
     """

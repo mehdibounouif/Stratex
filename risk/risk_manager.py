@@ -355,7 +355,7 @@ class RiskManager:
         try:
             max_dd_info = self.calculator.calculate_max_drawdown()
             max_dd      = abs(float(max_dd_info.get('max_drawdown', 0)))  # positive %
-            limit       = self.config.MAX_DRAWDOWN_BEFORE_HALT * 100      # to %
+            limit       = self.config.MAX_DRAWDOWN_BEFORE_HALT
 
             if max_dd > limit:
                 return False, (
