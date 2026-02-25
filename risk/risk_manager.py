@@ -369,6 +369,7 @@ class RiskManager:
 
     def _check_position_exists(self, ticker):
         """For SELL orders: verify we actually own this ticker."""
+        ticker = ticker.strip().upper()
         owned = [p.ticker for p in self.tracker.positions]
 
         if ticker not in owned:

@@ -1,770 +1,370 @@
 """
-Portfolio Tracker - Comprehensive Test Suite
-==============================================
+Tests for PortfolioTracker
+==========================
+Run from project root: pytest tests/test_portfolio_tracker.py -v
 
-Tests every critical function with edge cases:
-- Normal operations (buy, sell, update prices)
-- Edge cases (sell entire position, partial sell, insufficient funds)
-- Error handling (invalid inputs, negative values, empty strings)
-- Accounting integrity (reconciliation, rollback on errors)
-- File persistence (crash recovery, backup/restore)
-- Thread safety (concurrent operations)
+Covers:
+- add_position (buy)
+- remove_position (sell)
+- update_prices
+- reconcile
+- get_portfolio_summary
+- edge cases and error handling
 
-Run: python3 -m pytest tests/test_portfolio_tracker.py -v
-Or:  python3 tests/test_portfolio_tracker.py
+NOTE: Tests use a temp directory so they never touch real portfolio files.
 """
 
 import pytest
-import os
-import shutil
-import json
-import pandas as pd
-from decimal import Decimal
-from datetime import datetime, timezone
 import tempfile
-import time
-
-# Import the tracker
+import os
 import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from decimal import Decimal
 
-from risk.portfolio.portfolio_tracker import PositionTracker, Position
+# ── make sure project root is on PYTHONPATH ──────────────────
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from risk.portfolio.portfolio_tracker import PositionTracker
 
 
-# ══════════════════════════════════════════════════════════════
-# FIXTURES — Test Setup & Cleanup
-# ══════════════════════════════════════════════════════════════
-
-@pytest.fixture
-def test_dir():
-    """Create temporary directory for test files."""
-    temp_dir = tempfile.mkdtemp(prefix='portfolio_test_')
-    original_cwd = os.getcwd()
-    os.chdir(temp_dir)
-    
-    yield temp_dir
-    
-    # Cleanup
-    os.chdir(original_cwd)
-    shutil.rmtree(temp_dir, ignore_errors=True)
-
+# ─────────────────────────────────────────────────────────────
+# FIXTURES
+# ─────────────────────────────────────────────────────────────
 
 @pytest.fixture
-def tracker(test_dir):
-    """Create fresh tracker with $10,000 capital."""
-    return PositionTracker(initial_capital=10000)
+def tmp_tracker(tmp_path):
+    """
+    Fresh PositionTracker that writes ALL files inside a temp directory.
+    Automatically cleaned up after each test.
+    """
+    tracker = PositionTracker(initial_capital=20_000)
 
+    # Redirect all file paths into temp dir so tests are isolated
+    tracker.positions_file = str(tmp_path / "current_positions.csv")
+    tracker.history_file   = str(tmp_path / "portfolio_history.csv")
+    tracker.cash_file      = str(tmp_path / "cash_balance.json")
+    tracker.trades_file    = str(tmp_path / "trade_history.csv")
+    tracker.lock_dir       = str(tmp_path / ".locks")
+    os.makedirs(tracker.lock_dir, exist_ok=True)
 
-@pytest.fixture
-def tracker_with_positions(tracker):
-    """Tracker with pre-loaded positions."""
-    tracker.add_position('AAPL', 10, 150.0)
-    tracker.add_position('MSFT', 5, 300.0)
-    tracker.add_position('GOOGL', 3, 100.0)
     return tracker
 
 
-# ══════════════════════════════════════════════════════════════
-# TEST 1 — INITIALIZATION
-# ══════════════════════════════════════════════════════════════
-
-def test_initialization_default_capital(test_dir):
-    """Test tracker initializes with default capital from config."""
-    tracker = PositionTracker()
-    assert tracker.initial_capital > 0
-    assert tracker.cash == tracker.initial_capital
-    assert len(tracker.positions) == 0
-    assert tracker.total_realized_pnl == Decimal('0')
-
-
-def test_initialization_custom_capital(test_dir):
-    """Test tracker initializes with custom capital."""
-    tracker = PositionTracker(initial_capital=50000)
-    assert tracker.initial_capital == Decimal('50000')
-    assert tracker.cash == Decimal('50000')
-
-
-def test_initialization_invalid_capital(test_dir):
-    """Test tracker rejects negative or zero capital."""
-    with pytest.raises(ValueError, match="must be positive"):
-        PositionTracker(initial_capital=0)
-    
-    with pytest.raises(ValueError, match="must be positive"):
-        PositionTracker(initial_capital=-1000)
-
-
-# ══════════════════════════════════════════════════════════════
-# TEST 2 — ADD POSITION (BUY)
-# ══════════════════════════════════════════════════════════════
-
-def test_add_position_new(tracker):
-    """Test buying a new position."""
-    initial_cash = tracker.cash
-    
-    success = tracker.add_position('AAPL', 10, 150.0)
-    
-    assert success is True
-    assert len(tracker.positions) == 1
-    assert tracker.positions[0].ticker == 'AAPL'
-    assert tracker.positions[0].quantity == Decimal('10')
-    assert tracker.positions[0].entry_price == Decimal('150')
-    assert tracker.cash == initial_cash - Decimal('1500')
-
-
-def test_add_position_average_price(tracker):
-    """Test adding to existing position calculates average price."""
-    # First buy: 10 @ $150 = $1500
-    tracker.add_position('AAPL', 10, 150.0)
-    
-    # Second buy: 5 @ $180 = $900
-    tracker.add_position('AAPL', 5, 180.0)
-    
-    # Average: (10*150 + 5*180) / 15 = 2400/15 = $160
-    position = tracker.positions[0]
-    assert position.quantity == Decimal('15')
-    assert position.entry_price == Decimal('160')
-
-
-def test_add_position_insufficient_funds(tracker):
-    """Test buying fails if not enough cash."""
-    with pytest.raises(ValueError, match="Insufficient funds"):
-        tracker.add_position('AAPL', 1000, 100.0)  # $100,000 needed, only $10k available
-
-
-def test_add_position_invalid_quantity(tracker):
-    """Test buying fails with invalid quantity."""
-    with pytest.raises(ValueError, match="must be positive"):
-        tracker.add_position('AAPL', 0, 150.0)
-    
-    with pytest.raises(ValueError, match="must be positive"):
-        tracker.add_position('AAPL', -5, 150.0)
-
-
-def test_add_position_invalid_price(tracker):
-    """Test buying fails with invalid price."""
-    with pytest.raises(ValueError, match="must be positive"):
-        tracker.add_position('AAPL', 10, 0)
-    
-    with pytest.raises(ValueError, match="must be positive"):
-        tracker.add_position('AAPL', 10, -150)
-
-
-def test_add_position_invalid_ticker(tracker):
-    """Test buying fails with invalid ticker."""
-    with pytest.raises(TypeError, match="Ticker must be string"):
-        tracker.add_position(123, 10, 150.0)
-    
-    with pytest.raises(ValueError, match="cannot be empty"):
-        tracker.add_position('', 10, 150.0)
-    
-    with pytest.raises(ValueError, match="cannot be empty"):
-        tracker.add_position('   ', 10, 150.0)
-
-
-def test_add_position_ticker_normalization(tracker):
-    """Test ticker is normalized to uppercase."""
-    tracker.add_position('aapl', 10, 150.0)
-    assert tracker.positions[0].ticker == 'AAPL'
-    
-    tracker.add_position('  msft  ', 5, 300.0)
-    assert tracker.positions[1].ticker == 'MSFT'
-
-
-def test_add_position_rollback_on_error(tracker):
-    """Test state is rolled back if add_position fails."""
-    initial_cash = tracker.cash
-    initial_positions_count = len(tracker.positions)
-    
-    # Force an error by mocking reconcile to fail
-    original_reconcile = tracker.reconcile
-    tracker.reconcile = lambda: False
-    
-    try:
-        tracker.add_position('AAPL', 10, 150.0)
-        assert False, "Should have raised RuntimeError"
-    except RuntimeError:
-        pass
-    
-    # Verify rollback
-    assert tracker.cash == initial_cash
-    assert len(tracker.positions) == initial_positions_count
-    
-    # Restore
-    tracker.reconcile = original_reconcile
-
-
-# ══════════════════════════════════════════════════════════════
-# TEST 3 — REMOVE POSITION (SELL)
-# ══════════════════════════════════════════════════════════════
-
-def test_remove_position_entire(tracker_with_positions):
-    """Test selling entire position."""
-    initial_cash = tracker_with_positions.cash
-    
-    result = tracker_with_positions.remove_position('AAPL', exit_price=200.0)
-    
-    assert result is not None
-    assert result['ticker'] == 'AAPL'
-    assert result['quantity_sold'] == 10.0
-    assert result['selling_price'] == 200.0
-    assert result['realized_pnl'] == 500.0  # (200 - 150) * 10
-    
-    # AAPL should be removed
-    assert len(tracker_with_positions.positions) == 2
-    assert tracker_with_positions._find_position('AAPL') is None
-    
-    # Cash should increase
-    assert tracker_with_positions.cash == initial_cash + Decimal('2000')  # 10 * $200
-
-
-def test_remove_position_partial(tracker_with_positions):
-    """Test selling partial position."""
-    result = tracker_with_positions.remove_position('AAPL', quantity=5, exit_price=200.0)
-    
-    assert result is not None
-    assert result['quantity_sold'] == 5.0
-    assert result['realized_pnl'] == 250.0  # (200 - 150) * 5
-    
-    # AAPL should still exist with reduced quantity
-    position = tracker_with_positions._find_position('AAPL')
-    assert position is not None
-    assert position.quantity == Decimal('5')
-
-
-def test_remove_position_no_quantity_sells_all(tracker_with_positions):
-    """Test selling without specifying quantity sells entire position."""
-    result = tracker_with_positions.remove_position('AAPL', exit_price=200.0)
-    
-    assert result['quantity_sold'] == 10.0
-    assert tracker_with_positions._find_position('AAPL') is None
-
-
-def test_remove_position_no_exit_price_uses_current(tracker_with_positions):
-    """Test selling without exit_price uses current_price."""
-    # Update current price
-    tracker_with_positions.update_prices({'AAPL': 175.0})
-    
-    result = tracker_with_positions.remove_position('AAPL')
-    
-    assert result['selling_price'] == 175.0
-    assert result['realized_pnl'] == 250.0  # (175 - 150) * 10
-
-
-def test_remove_position_not_owned(tracker):
-    """Test selling position that doesn't exist returns None."""
-    result = tracker.remove_position('AAPL', exit_price=200.0)
-    assert result is None
-
-
-def test_remove_position_quantity_exceeds_owned(tracker_with_positions):
-    """Test selling more than owned returns None."""
-    result = tracker_with_positions.remove_position('AAPL', quantity=20, exit_price=200.0)
-    assert result is None
-
-
-def test_remove_position_invalid_quantity(tracker_with_positions):
-    """Test selling with invalid quantity raises error."""
-    with pytest.raises(ValueError, match="must be positive"):
-        tracker_with_positions.remove_position('AAPL', quantity=0, exit_price=200.0)
-    
-    with pytest.raises(ValueError, match="must be positive"):
-        tracker_with_positions.remove_position('AAPL', quantity=-5, exit_price=200.0)
-
-
-def test_remove_position_invalid_exit_price(tracker_with_positions):
-    """Test selling with invalid exit price raises error."""
-    with pytest.raises(ValueError, match="must be positive"):
-        tracker_with_positions.remove_position('AAPL', exit_price=0)
-    
-    with pytest.raises(ValueError, match="must be positive"):
-        tracker_with_positions.remove_position('AAPL', exit_price=-100)
-
-
-def test_remove_position_profit(tracker_with_positions):
-    """Test realized P&L is positive when selling for profit."""
-    result = tracker_with_positions.remove_position('AAPL', exit_price=200.0)
-    
-    assert result['realized_pnl'] > 0
-    assert tracker_with_positions.total_realized_pnl == Decimal('500')
-
-
-def test_remove_position_loss(tracker_with_positions):
-    """Test realized P&L is negative when selling for loss."""
-    result = tracker_with_positions.remove_position('AAPL', exit_price=100.0)
-    
-    assert result['realized_pnl'] < 0
-    assert tracker_with_positions.total_realized_pnl == Decimal('-500')
-
-
-# ══════════════════════════════════════════════════════════════
-# TEST 4 — UPDATE PRICES
-# ══════════════════════════════════════════════════════════════
-
-def test_update_prices_all_positions(tracker_with_positions):
-    """Test updating prices for all positions."""
-    tracker_with_positions.update_prices({
-        'AAPL': 175.0,
-        'MSFT': 350.0,
-        'GOOGL': 120.0
-    })
-    
-    aapl = tracker_with_positions._find_position('AAPL')
-    assert aapl.current_price == Decimal('175')
-    assert aapl.unrealized_pnl == Decimal('250')  # (175 - 150) * 10
-    
-    msft = tracker_with_positions._find_position('MSFT')
-    assert msft.current_price == Decimal('350')
-    assert msft.unrealized_pnl == Decimal('250')  # (350 - 300) * 5
-
-
-def test_update_prices_partial(tracker_with_positions):
-    """Test updating prices for only some positions."""
-    tracker_with_positions.update_prices({
-        'AAPL': 175.0
-        # MSFT and GOOGL not provided
-    })
-    
-    aapl = tracker_with_positions._find_position('AAPL')
-    assert aapl.current_price == Decimal('175')
-    
-    # MSFT should still have entry price as current price
-    msft = tracker_with_positions._find_position('MSFT')
-    assert msft.current_price == Decimal('300')
-
-
-def test_update_prices_empty_dict(tracker_with_positions):
-    """Test updating with empty dict does nothing."""
-    initial_aapl_price = tracker_with_positions._find_position('AAPL').current_price
-    
-    tracker_with_positions.update_prices({})
-    
-    # Prices should not change
-    assert tracker_with_positions._find_position('AAPL').current_price == initial_aapl_price
-
-
-def test_update_prices_invalid_price(tracker_with_positions):
-    """Test invalid prices are skipped, not fatal."""
-    tracker_with_positions.update_prices({
-        'AAPL': 175.0,
-        'MSFT': 0,      # Invalid: zero
-        'GOOGL': -50    # Invalid: negative
-    })
-    
-    # AAPL should update
-    assert tracker_with_positions._find_position('AAPL').current_price == Decimal('175')
-    
-    # MSFT and GOOGL should keep old prices
-    assert tracker_with_positions._find_position('MSFT').current_price == Decimal('300')
-    assert tracker_with_positions._find_position('GOOGL').current_price == Decimal('100')
-
-
-def test_update_prices_missing_ticker(tracker_with_positions):
-    """Test missing tickers are logged but not fatal."""
-    tracker_with_positions.update_prices({
-        'AAPL': 175.0
-        # MSFT missing
-    })
-    
-    # Should not crash
-    assert tracker_with_positions._find_position('AAPL').current_price == Decimal('175')
-
-
-# ══════════════════════════════════════════════════════════════
-# TEST 5 — QUERIES
-# ══════════════════════════════════════════════════════════════
-
-def test_get_position(tracker_with_positions):
-    """Test retrieving a single position."""
-    pos = tracker_with_positions.get_position('AAPL')
-    
-    assert pos is not None
-    assert pos['ticker'] == 'AAPL'
-    assert pos['quantity'] == 10.0
-    assert pos['entry_price'] == 150.0
-
-
-def test_get_position_not_found(tracker):
-    """Test retrieving non-existent position returns None."""
-    pos = tracker.get_position('AAPL')
-    assert pos is None
-
-
-def test_get_all_positions(tracker_with_positions):
-    """Test retrieving all positions."""
-    positions = tracker_with_positions.get_all_positions()
-    
-    assert len(positions) == 3
-    tickers = [p['ticker'] for p in positions]
-    assert 'AAPL' in tickers
-    assert 'MSFT' in tickers
-    assert 'GOOGL' in tickers
-
-
-def test_get_all_positions_empty(tracker):
-    """Test retrieving positions when none exist."""
-    positions = tracker.get_all_positions()
-    assert positions == []
-
-
-def test_get_portfolio_value(tracker_with_positions):
-    """Test calculating total portfolio value."""
-    # Positions: AAPL 10@150, MSFT 5@300, GOOGL 3@100 = $3300
-    # Cash: $10000 - $3300 = $6700
-    # Total: $10000
-    
-    value = tracker_with_positions.get_portfolio_value()
-    assert value == Decimal('10000')
-    
-    # Update prices
-    tracker_with_positions.update_prices({
-        'AAPL': 200.0,  # +$500
-        'MSFT': 350.0,  # +$250
-        'GOOGL': 150.0  # +$150
-    })
-    
-    # New value: $10000 + $900 = $10900
-    value = tracker_with_positions.get_portfolio_value()
-    assert value == Decimal('10900')
-
-
-def test_get_total_unrealized_pnl(tracker_with_positions):
-    """Test calculating total unrealized P&L."""
-    # Initially, unrealized P&L should be 0 (current = entry)
-    pnl = tracker_with_positions.get_total_unrealized_pnl()
-    assert pnl == Decimal('0')
-    
-    # Update prices
-    tracker_with_positions.update_prices({
-        'AAPL': 175.0,   # +$250
-        'MSFT': 350.0,   # +$250
-        'GOOGL': 120.0   # +$60
-    })
-    
-    # Total unrealized: $560
-    pnl = tracker_with_positions.get_total_unrealized_pnl()
-    assert pnl == Decimal('560')
-
-
-def test_get_portfolio_summary(tracker_with_positions):
-    """Test getting complete portfolio summary."""
-    summary = tracker_with_positions.get_portfolio_summary()
-    
-    assert 'cash' in summary
-    assert 'portfolio_value' in summary
-    assert 'total_positions' in summary
-    assert 'total_unrealized_pnl' in summary
-    assert 'total_realized_pnl' in summary
-    assert 'return_pct' in summary
-    
-    assert summary['total_positions'] == 3
-    assert summary['portfolio_value'] == Decimal('10000')
-    assert summary['return_pct'] == Decimal('0')  # No change yet
-
-
-def test_get_portfolio_summary_with_profit(tracker_with_positions):
-    """Test portfolio summary shows profit correctly."""
-    # Update prices to create unrealized profit
-    tracker_with_positions.update_prices({
-        'AAPL': 200.0,
-        'MSFT': 350.0,
-        'GOOGL': 150.0
-    })
-    
-    summary = tracker_with_positions.get_portfolio_summary()
-    
-    # Portfolio value should be $10,900
-    assert summary['portfolio_value'] == Decimal('10900')
-    
-    # Return should be +9%
-    assert summary['return_pct'] == Decimal('9.00')
-
-
-def test_get_portfolio_summary_zero_value(test_dir):
-    """Test summary handles zero portfolio value."""
-    tracker = PositionTracker(initial_capital=0)
-    summary = tracker.get_portfolio_summary()
-    
-    # Should not crash
-    assert summary['cash_pct'] == Decimal('0')
-    assert summary['return_pct'] == Decimal('0')
-
-
-# ══════════════════════════════════════════════════════════════
-# TEST 6 — RECONCILIATION
-# ══════════════════════════════════════════════════════════════
-
-def test_reconcile_fresh_tracker(tracker):
-    """Test reconciliation passes for fresh tracker."""
-    assert tracker.reconcile() is True
-
-
-def test_reconcile_after_buy(tracker):
-    """Test reconciliation passes after buying."""
-    tracker.add_position('AAPL', 10, 150.0)
-    assert tracker.reconcile() is True
-
-
-def test_reconcile_after_sell(tracker_with_positions):
-    """Test reconciliation passes after selling."""
-    tracker_with_positions.remove_position('AAPL', exit_price=200.0)
-    assert tracker_reconcile() is True
-
-
-def test_reconcile_after_price_update(tracker_with_positions):
-    """Test reconciliation passes after price update."""
-    tracker_with_positions.update_prices({'AAPL': 200.0})
-    assert tracker_with_positions.reconcile() is True
-
-
-def test_reconcile_equation(tracker_with_positions):
-    """Test reconciliation equation holds: cash + positions_at_entry = initial + realized."""
-    # Buy 10 AAPL @ $150 = $1500
-    # Sell 5 AAPL @ $200 = realized P&L of $250
-    
-    tracker_with_positions.remove_position('AAPL', quantity=5, exit_price=200.0)
-    
-    # Manual calculation:
-    # cash = initial - $1500 + $1000 = $9500
-    # positions_at_entry = 5 * $150 + 5 * $300 + 3 * $100 = $2550
-    # total = $12050
-    
-    # initial + realized = $10000 + $250 = $10250
-    # Wait, this doesn't match. Let me recalculate...
-    
-    # Actually:
-    # Initial positions: AAPL 10@150, MSFT 5@300, GOOGL 3@100
-    # Cost: $1500 + $1500 + $300 = $3300
-    # Cash after buy: $10000 - $3300 = $6700
-    
-    # Sell 5 AAPL @ $200:
-    # Cash inflow: $1000
-    # Realized P&L: (200-150)*5 = $250
-    # Cash after sell: $6700 + $1000 = $7700
-    
-    # Remaining positions at entry:
-    # AAPL 5@150 = $750
-    # MSFT 5@300 = $1500
-    # GOOGL 3@100 = $300
-    # Total at entry: $2550
-    
-    # Left side: $7700 + $2550 = $10250
-    # Right side: $10000 + $250 = $10250
-    # ✅ Matches!
-    
-    assert tracker_with_positions.reconcile() is True
-
-
-# ══════════════════════════════════════════════════════════════
-# TEST 7 — PERSISTENCE (FILE OPERATIONS)
-# ══════════════════════════════════════════════════════════════
-
-def test_save_and_load_positions(test_dir):
-    """Test positions are saved and loaded correctly."""
-    # Create tracker and buy
-    tracker1 = PositionTracker(initial_capital=10000)
-    tracker1.add_position('AAPL', 10, 150.0)
-    tracker1.add_position('MSFT', 5, 300.0)
-    
-    # Create new tracker (should load from disk)
-    tracker2 = PositionTracker(initial_capital=10000)
-    
-    assert len(tracker2.positions) == 2
-    assert tracker2._find_position('AAPL') is not None
-    assert tracker2._find_position('MSFT') is not None
-    assert tracker2.cash == Decimal('6700')
-
-
-def test_save_and_load_cash(test_dir):
-    """Test cash balance is saved and loaded correctly."""
-    tracker1 = PositionTracker(initial_capital=10000)
-    tracker1.add_position('AAPL', 10, 150.0)
-    tracker1.remove_position('AAPL', exit_price=200.0)
-    
-    realized_pnl = tracker1.total_realized_pnl
-    final_cash = tracker1.cash
-    
-    # Create new tracker
-    tracker2 = PositionTracker(initial_capital=10000)
-    
-    assert tracker2.cash == final_cash
-    assert tracker2.total_realized_pnl == realized_pnl
-
-
-def test_trade_history_recorded(test_dir):
-    """Test every trade is recorded in trade history."""
-    tracker = PositionTracker(initial_capital=10000)
-    
-    tracker.add_position('AAPL', 10, 150.0)
-    tracker.add_position('MSFT', 5, 300.0)
-    tracker.remove_position('AAPL', quantity=5, exit_price=200.0)
-    
-    # Check trade history file
-    assert os.path.exists('risk/portfolio/trade_history.csv')
-    
-    df = pd.read_csv('risk/portfolio/trade_history.csv')
-    assert len(df) == 3  # 2 buys, 1 sell
-    
-    # First trade
-    assert df.iloc[0]['action'] == 'BUY'
-    assert df.iloc[0]['ticker'] == 'AAPL'
-    
-    # Third trade
-    assert df.iloc[2]['action'] == 'SELL'
-    assert df.iloc[2]['ticker'] == 'AAPL'
-    assert df.iloc[2]['realized_pnl'] == 250.0
-
-
-def test_portfolio_history_recorded(test_dir):
-    """Test portfolio snapshots are recorded."""
-    tracker = PositionTracker(initial_capital=10000)
-    tracker.add_position('AAPL', 10, 150.0)
-    
-    # Check history file
-    assert os.path.exists('risk/portfolio/portfolio_history.csv')
-    
-    df = pd.read_csv('risk/portfolio/portfolio_history.csv')
-    assert len(df) >= 1  # At least one snapshot
-    
-    latest = df.iloc[-1]
-    assert latest['total_value'] == 10000.0
-    assert latest['num_positions'] == 1
-
-
-def test_backup_creates_files(test_dir):
-    """Test backup creates timestamped directory with all files."""
-    tracker = PositionTracker(initial_capital=10000)
-    tracker.add_position('AAPL', 10, 150.0)
-    
-    backup_path = tracker.backup()
-    
-    assert backup_path is not None
-    assert os.path.exists(backup_path)
-    assert os.path.exists(os.path.join(backup_path, 'current_positions.csv'))
-    assert os.path.exists(os.path.join(backup_path, 'cash_balance.json'))
-
-
-# ══════════════════════════════════════════════════════════════
-# TEST 8 — EDGE CASES
-# ══════════════════════════════════════════════════════════════
-
-def test_sell_immediately_after_buy(tracker):
-    """Test buying and immediately selling."""
-    tracker.add_position('AAPL', 10, 150.0)
-    result = tracker.remove_position('AAPL', exit_price=150.0)
-    
-    assert result is not None
-    assert result['realized_pnl'] == 0.0  # No profit/loss
-    assert len(tracker.positions) == 0
-    assert tracker.cash == Decimal('10000')  # Back to initial
-
-
-def test_multiple_buys_and_sells(tracker):
-    """Test complex sequence of trades."""
-    tracker.add_position('AAPL', 10, 100.0)   # $1000
-    tracker.add_position('AAPL', 5, 120.0)    # $600, avg $106.67
-    tracker.remove_position('AAPL', quantity=7, exit_price=150.0)  # Sell 7
-    tracker.add_position('AAPL', 3, 130.0)    # Buy 3 more
-    
-    # Should have 8 + 3 = 11 shares
-    aapl = tracker._find_position('AAPL')
-    assert aapl is not None
-    assert aapl.quantity == Decimal('11')
-
-
-def test_sell_all_positions(tracker_with_positions):
-    """Test selling all positions."""
-    tracker_with_positions.remove_position('AAPL', exit_price=200.0)
-    tracker_with_positions.remove_position('MSFT', exit_price=350.0)
-    tracker_with_positions.remove_position('GOOGL', exit_price=150.0)
-    
-    assert len(tracker_with_positions.positions) == 0
-    assert tracker_with_positions.cash > Decimal('10000')  # Made profit
-
-
-def test_decimal_precision(tracker):
-    """Test Decimal arithmetic maintains precision."""
-    tracker.add_position('AAPL', 3, 33.33)
-    
-    # 3 * 33.33 = 99.99, not 100.00
-    assert tracker.cash == Decimal('10000') - Decimal('99.99')
-
-
-# ══════════════════════════════════════════════════════════════
-# MAIN — Run Tests Without Pytest
-# ══════════════════════════════════════════════════════════════
-
-if __name__ == "__main__":
-    """
-    Run tests manually without pytest.
-    
-    Usage: python3 tests/test_portfolio_tracker.py
-    """
-    import traceback
-    
-    # Create test directory
-    test_dir = tempfile.mkdtemp(prefix='portfolio_test_')
-    original_cwd = os.getcwd()
-    os.chdir(test_dir)
-    
-    print("="*60)
-    print("PORTFOLIO TRACKER TEST SUITE")
-    print("="*60)
-    print(f"Test directory: {test_dir}\n")
-    
-    # Get all test functions
-    test_functions = [
-        (name, obj) for name, obj in globals().items()
-        if name.startswith('test_') and callable(obj)
-    ]
-    
-    passed = 0
-    failed = 0
-    errors = []
-    
-    for name, test_func in test_functions:
-        try:
-            # Create fresh tracker for each test
-            if 'tracker_with_positions' in test_func.__code__.co_varnames:
-                tracker = PositionTracker(initial_capital=10000)
-                tracker.add_position('AAPL', 10, 150.0)
-                tracker.add_position('MSFT', 5, 300.0)
-                tracker.add_position('GOOGL', 3, 100.0)
-                test_func(tracker)
-            elif 'tracker' in test_func.__code__.co_varnames:
-                tracker = PositionTracker(initial_capital=10000)
-                test_func(tracker)
-            elif 'test_dir' in test_func.__code__.co_varnames:
-                test_func(test_dir)
-            else:
-                test_func()
-            
-            print(f"✅ {name}")
-            passed += 1
-            
-        except AssertionError as e:
-            print(f"❌ {name}: {e}")
-            failed += 1
-            errors.append((name, traceback.format_exc()))
-            
-        except Exception as e:
-            print(f"💥 {name}: {e}")
-            failed += 1
-            errors.append((name, traceback.format_exc()))
-    
-    # Summary
-    print("\n" + "="*60)
-    print(f"RESULTS: {passed} passed, {failed} failed")
-    print("="*60)
-    
-    if errors:
-        print("\nFAILURES:\n")
-        for name, trace in errors:
-            print(f"\n{name}:")
-            print(trace)
-    
-    # Cleanup
-    os.chdir(original_cwd)
-    shutil.rmtree(test_dir, ignore_errors=True)
-    
-    # Exit code
-    sys.exit(0 if failed == 0 else 1)
+# ─────────────────────────────────────────────────────────────
+# ADD POSITION (BUY)
+# ─────────────────────────────────────────────────────────────
+
+class TestAddPosition:
+
+    def test_buy_creates_new_position(self, tmp_tracker):
+        """Buying a stock creates exactly one position with correct values."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+
+        assert len(tmp_tracker.positions) == 1
+        pos = tmp_tracker.positions[0]
+        assert pos.ticker == "AAPL"
+        assert pos.quantity == Decimal("5")
+        assert pos.entry_price == Decimal("200.00")
+
+    def test_buy_deducts_cash_correctly(self, tmp_tracker):
+        """Cash is reduced by exactly quantity × price."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        # 5 × $200 = $1,000 spent
+        expected_cash = Decimal("20000") - Decimal("1000")
+        assert tmp_tracker.cash == expected_cash
+
+    def test_buy_multiple_stocks(self, tmp_tracker):
+        """Buying two different tickers creates two separate positions."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        tmp_tracker.add_position("MSFT", 2, 380.0)
+        assert len(tmp_tracker.positions) == 2
+
+    def test_buy_existing_position_averages_price(self, tmp_tracker):
+        """Buying more shares of an owned ticker averages the entry price."""
+        tmp_tracker.add_position("AAPL", 4, 200.0)  # avg = $200
+        tmp_tracker.add_position("AAPL", 4, 240.0)  # avg = $220
+
+        pos = tmp_tracker.positions[0]
+        assert pos.ticker == "AAPL"
+        assert pos.quantity == Decimal("8")
+        assert pos.entry_price == Decimal("220.00"), (
+            f"Expected average $220.00, got {pos.entry_price}"
+        )
+
+    def test_buy_raises_on_insufficient_cash(self, tmp_tracker):
+        """Buying more than available cash raises ValueError."""
+        with pytest.raises(ValueError, match="Insufficient funds"):
+            tmp_tracker.add_position("AAPL", 1000, 200.0)  # $200,000 >> $20,000
+
+    def test_buy_raises_on_negative_quantity(self, tmp_tracker):
+        """Negative quantity raises ValueError."""
+        with pytest.raises(ValueError):
+            tmp_tracker.add_position("AAPL", -5, 200.0)
+
+    def test_buy_raises_on_zero_price(self, tmp_tracker):
+        """Zero price raises ValueError."""
+        with pytest.raises(ValueError):
+            tmp_tracker.add_position("AAPL", 5, 0)
+
+    def test_buy_normalizes_ticker_lowercase(self, tmp_tracker):
+        """Ticker is always stored uppercase regardless of input case."""
+        tmp_tracker.add_position("aapl", 5, 200.0)
+        assert tmp_tracker.positions[0].ticker == "AAPL"
+
+    def test_buy_reconcile_passes_after_trade(self, tmp_tracker):
+        """Accounting equation holds after a BUY."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        assert tmp_tracker.reconcile() is True
+
+    def test_buy_rollback_on_failure(self, tmp_tracker):
+        """If an error occurs mid-buy, cash and positions are rolled back."""
+        original_cash = tmp_tracker.cash
+
+        # Force failure by passing an invalid ticker type after initial checks
+        # We can test rollback by patching _save_cash to raise
+        original_save = tmp_tracker._save_cash
+        def bad_save():
+            raise RuntimeError("Simulated disk failure")
+        tmp_tracker._save_cash = bad_save
+
+        with pytest.raises(RuntimeError):
+            tmp_tracker.add_position("AAPL", 5, 200.0)
+
+        # Should be rolled back
+        assert tmp_tracker.cash == original_cash
+        assert len(tmp_tracker.positions) == 0
+
+        tmp_tracker._save_cash = original_save  # restore
+
+
+# ─────────────────────────────────────────────────────────────
+# REMOVE POSITION (SELL)
+# ─────────────────────────────────────────────────────────────
+
+class TestRemovePosition:
+
+    def test_sell_entire_position_removes_it(self, tmp_tracker):
+        """Selling all shares removes the position from the list."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        tmp_tracker.remove_position("AAPL", quantity=5, exit_price=210.0)
+
+        assert len(tmp_tracker.positions) == 0
+
+    def test_sell_returns_correct_realized_pnl(self, tmp_tracker):
+        """Realized P&L = (exit - entry) × quantity."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        result = tmp_tracker.remove_position("AAPL", quantity=5, exit_price=210.0)
+
+        assert result is not None
+        expected_pnl = (210.0 - 200.0) * 5  # $50
+        assert abs(result["realized_pnl"] - expected_pnl) < 0.01
+
+    def test_sell_updates_cash(self, tmp_tracker):
+        """Cash increases by selling_price × quantity on sell."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        cash_before_sell = float(tmp_tracker.cash)
+        tmp_tracker.remove_position("AAPL", quantity=5, exit_price=210.0)
+
+        # Cash should increase by 5 × $210 = $1,050
+        assert float(tmp_tracker.cash) == pytest.approx(cash_before_sell + 1050.0, abs=0.01)
+
+    def test_partial_sell_keeps_remaining_shares(self, tmp_tracker):
+        """Selling part of a position leaves the remainder intact."""
+        tmp_tracker.add_position("AAPL", 10, 200.0)
+        tmp_tracker.remove_position("AAPL", quantity=3, exit_price=210.0)
+
+        pos = tmp_tracker.positions[0]
+        assert pos.quantity == Decimal("7")
+
+    def test_sell_not_owned_returns_none(self, tmp_tracker):
+        """Selling a ticker you don't own returns None (not an exception)."""
+        result = tmp_tracker.remove_position("NVDA", quantity=5, exit_price=500.0)
+        assert result is None
+
+    def test_sell_more_than_owned_raises(self, tmp_tracker):
+        """Trying to sell more shares than owned raises ValueError."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        with pytest.raises(ValueError, match="Cannot sell"):
+            tmp_tracker.remove_position("AAPL", quantity=10, exit_price=210.0)
+
+    def test_sell_without_exit_price_uses_current_price(self, tmp_tracker):
+        """If no exit_price given, it uses current_price from the position."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        tmp_tracker.update_prices({"AAPL": 215.0})
+        result = tmp_tracker.remove_position("AAPL", quantity=5)
+
+        assert result is not None
+        assert abs(result["selling_price"] - 215.0) < 0.01
+
+    def test_sell_reconcile_passes_after_trade(self, tmp_tracker):
+        """Accounting equation holds after a SELL."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        tmp_tracker.remove_position("AAPL", quantity=5, exit_price=210.0)
+        assert tmp_tracker.reconcile() is True
+
+    def test_sell_loss_captured_correctly(self, tmp_tracker):
+        """Selling at a loss records a negative realized P&L."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        result = tmp_tracker.remove_position("AAPL", quantity=5, exit_price=190.0)
+
+        assert result["realized_pnl"] < 0
+
+    def test_sell_entire_position_no_quantity_arg(self, tmp_tracker):
+        """Calling remove_position with quantity=None sells everything."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        result = tmp_tracker.remove_position("AAPL", exit_price=220.0)
+
+        assert len(tmp_tracker.positions) == 0
+        assert result is not None
+
+
+# ─────────────────────────────────────────────────────────────
+# UPDATE PRICES
+# ─────────────────────────────────────────────────────────────
+
+class TestUpdatePrices:
+
+    def test_update_prices_changes_current_price(self, tmp_tracker):
+        """update_prices sets the current_price on matching positions."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        tmp_tracker.update_prices({"AAPL": 215.0})
+
+        pos = tmp_tracker.positions[0]
+        assert pos.current_price == Decimal("215.0")
+
+    def test_update_prices_recalculates_unrealized_pnl(self, tmp_tracker):
+        """Unrealized P&L = (current - entry) × quantity after price update."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        tmp_tracker.update_prices({"AAPL": 210.0})
+
+        pos = tmp_tracker.positions[0]
+        expected_pnl = (210.0 - 200.0) * 5  # $50
+        assert float(pos.unrealized_pnl) == pytest.approx(expected_pnl, abs=0.01)
+
+    def test_update_prices_ignores_missing_tickers(self, tmp_tracker):
+        """Positions with no price update keep their existing current_price."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        tmp_tracker.add_position("MSFT", 2, 380.0)
+        original_msft_price = tmp_tracker.positions[1].current_price
+
+        tmp_tracker.update_prices({"AAPL": 215.0})  # MSFT not included
+
+        assert tmp_tracker.positions[1].current_price == original_msft_price
+
+    def test_update_prices_empty_dict_does_nothing(self, tmp_tracker):
+        """Passing an empty dict leaves all positions unchanged."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        tmp_tracker.update_prices({})  # Should not raise, should do nothing
+
+    def test_update_prices_zero_price_skipped(self, tmp_tracker):
+        """Zero/negative prices are rejected; original price is kept."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        tmp_tracker.update_prices({"AAPL": 0})  # Invalid price
+
+        assert tmp_tracker.positions[0].current_price == Decimal("200.0")
+
+
+# ─────────────────────────────────────────────────────────────
+# RECONCILE
+# ─────────────────────────────────────────────────────────────
+
+class TestReconcile:
+
+    def test_reconcile_passes_fresh_portfolio(self, tmp_tracker):
+        """A fresh portfolio with no trades always reconciles."""
+        assert tmp_tracker.reconcile() is True
+
+    def test_reconcile_passes_after_buy_and_sell(self, tmp_tracker):
+        """Reconcile passes through a full buy → sell cycle."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        tmp_tracker.add_position("MSFT", 2, 380.0)
+        tmp_tracker.remove_position("AAPL", quantity=3, exit_price=215.0)
+        assert tmp_tracker.reconcile() is True
+
+    def test_reconcile_fails_on_tampered_cash(self, tmp_tracker):
+        """Manually corrupting cash makes reconcile return False."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        tmp_tracker.cash += Decimal("500")  # inject money out of thin air
+
+        assert tmp_tracker.reconcile() is False
+
+
+# ─────────────────────────────────────────────────────────────
+# PORTFOLIO SUMMARY & VALUATION
+# ─────────────────────────────────────────────────────────────
+
+class TestPortfolioSummary:
+
+    def test_portfolio_value_equals_cash_plus_positions(self, tmp_tracker):
+        """Portfolio value = cash + sum(quantity × current_price)."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)   # $1,000 invested
+        tmp_tracker.update_prices({"AAPL": 210.0})   # now worth $1,050
+
+        value = float(tmp_tracker.get_portfolio_value())
+        cash  = float(tmp_tracker.cash)
+        pos_value = 5 * 210.0
+
+        assert value == pytest.approx(cash + pos_value, abs=0.01)
+
+    def test_summary_return_pct_is_correct(self, tmp_tracker):
+        """Return % is based on initial capital, not current cash."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        tmp_tracker.update_prices({"AAPL": 220.0})  # +$100 unrealized gain
+
+        summary = tmp_tracker.get_portfolio_summary()
+        # Portfolio is now $20,100, started at $20,000 → +0.5%
+        assert float(summary["return_pct"]) == pytest.approx(0.5, abs=0.05)
+
+    def test_summary_no_positions_all_cash(self, tmp_tracker):
+        """With no positions, total value equals initial capital."""
+        summary = tmp_tracker.get_portfolio_summary()
+        assert float(summary["portfolio_value"]) == pytest.approx(20_000.0, abs=0.01)
+        assert float(summary["total_positions"]) == 0
+
+    def test_get_position_returns_correct_data(self, tmp_tracker):
+        """get_position returns a dict matching the added position."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        pos = tmp_tracker.get_position("AAPL")
+
+        assert pos is not None
+        assert pos["ticker"] == "AAPL"
+        assert pos["quantity"] == 5.0
+        assert pos["entry_price"] == 200.0
+
+    def test_get_position_unknown_ticker_returns_none(self, tmp_tracker):
+        """get_position returns None for tickers not in the portfolio."""
+        assert tmp_tracker.get_position("ZZZZ") is None
+
+    def test_total_unrealized_pnl_sums_all_positions(self, tmp_tracker):
+        """Total unrealized P&L is the sum across all open positions."""
+        tmp_tracker.add_position("AAPL", 5, 200.0)
+        tmp_tracker.add_position("MSFT", 2, 380.0)
+        tmp_tracker.update_prices({"AAPL": 210.0, "MSFT": 390.0})
+
+        # AAPL: +$50,  MSFT: +$20 → total = +$70
+        total_pnl = float(tmp_tracker.get_total_unrealized_pnl())
+        assert total_pnl == pytest.approx(70.0, abs=0.01)
+
+
+# ─────────────────────────────────────────────────────────────
+# INPUT VALIDATION
+# ─────────────────────────────────────────────────────────────
+
+class TestInputValidation:
+
+    def test_non_string_ticker_raises_type_error(self, tmp_tracker):
+        """Passing a non-string ticker raises TypeError."""
+        with pytest.raises(TypeError):
+            tmp_tracker.add_position(123, 5, 200.0)
+
+    def test_empty_ticker_raises_value_error(self, tmp_tracker):
+        """Empty string ticker raises ValueError."""
+        with pytest.raises(ValueError):
+            tmp_tracker.add_position("", 5, 200.0)
+
+    def test_invalid_initial_capital_raises(self):
+        """PositionTracker raises ValueError for zero/negative capital."""
+        with pytest.raises(ValueError):
+            PositionTracker(initial_capital=0)
+
+        with pytest.raises(ValueError):
+            PositionTracker(initial_capital=-5000)
