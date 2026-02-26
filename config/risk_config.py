@@ -25,13 +25,20 @@ class RiskConfig:
 
     # Maximum percentage of portfolio allowed per sector
     # Protects against sector-wide crashes (concentration risk)
+
     MAX_SECTOR_EXPOSURE = {
-        'technology': 0.50,   # Tech stocks capped at 50%
-        'finance': 0.30,      # Financials capped at 30%
-        'healthcare': 0.30,   # Healthcare capped at 30%
-        'consumer': 0.30,     # Consumer goods capped at 30%
-        'energy': 0.20,       # Energy capped at 20% (typically volatile)
-        'other': 0.40         # Catch-all for uncategorized assets
+        'information technology': 0.50,
+        'communication services': 0.40,
+        'financials': 0.30,
+        'health care': 0.30,
+        'consumer discretionary': 0.30,
+        'consumer staples': 0.30,
+        'energy': 0.20,
+        'industrials': 0.35,
+        'materials': 0.30,
+        'utilities': 0.25,
+        'real estate': 0.25,
+        'other': 0.40
     }
 
 
