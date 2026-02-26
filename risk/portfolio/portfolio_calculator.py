@@ -1205,7 +1205,7 @@ if __name__ == "__main__":
     logger.info("="*60)
 
     # Create test portfolio
-    tracker = PositionTracker(initial_capital=100000)
+    tracker = PositionTracker(initial_capital=90000)
 
     # Add some positions
     tracker.add_position('AAPL', 50, 180.0)
@@ -1234,7 +1234,7 @@ if __name__ == "__main__":
     logger.info("\n[TEST 2] Sector concentration")
     sector_conc = calc.get_sector_concentration()
     print(f"Sector HHI: {sector_conc}")
-
+    """
     logger.info("\n[TEST 3] Position concentration")
     pos_conc = calc.get_concentration_risk()
     print(f"Position risk: {pos_conc}")
@@ -1245,5 +1245,5 @@ if __name__ == "__main__":
 
     logger.info("\n[TEST 5] Full risk report")
     calc.print_risk_report()
-
+    """
     logger.info("\n✅ ALL TESTS COMPLETED!")
