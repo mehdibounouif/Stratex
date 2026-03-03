@@ -1,0 +1,3 @@
+ticker,quantity,entry_price,current_price,unrealized_pnl,entry_date
+AAPL,2.0,200.0,210.5,21.0,2026-02-27T01:28:19.680975+00:00
+MSFT,2.0,380.0,390.2,20.4,2026-02-27T01:28:19.705686+00:00
