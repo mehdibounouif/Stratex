@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 from logger import setup_logging, get_logger
 import yfinance as yf
+import math
 
 
 setup_logging()
@@ -878,7 +879,7 @@ class PortfolioCalculator:
 
             # find the cutoff index — worst (1 - confidence)% of days
             # e.g. 95% confidence, 252 days → index 12 → 13th worst day
-            index = int(float(Decimal("1") - confidence) * len(sorted_returns))
+            index = math.ceil(float(Decimal("1") - confidence) * len(sorted_returns))
 
             if index <= 0 or index >= len(sorted_returns):
                 logger.warning(
@@ -923,118 +924,85 @@ class PortfolioCalculator:
 
     def calculate_max_drawdown(self):
         """
-        Compute maximum historical drawdown.
-        
-        Returns
-        -------
-        dict
-            {
-                'max_drawdown': Decimal,
-                'peak_value': Decimal,
-                'trough_value': Decimal,
-                'peak_date': str,
-                'trough_date': str
-            }
-        
-        Description
-        -----------
-        - Tracks running portfolio peak
-        - Measures decline from peak to trough
-        - Identifies worst loss period
+        Find the worst peak-to-trough drop in portfolio value over the last 252 days.
+        Returns a dict with the drawdown %, and the dates/values of the peak and trough.
         """
         logger.info("Calculating maximum drawdown.")
         try:
+            # --- 1. Get holdings and price history ---
             position_weights = self.get_position_weights()
             if not position_weights:
-                logger.warning("No position weights available — cannot compute max drawdown.")
+                logger.warning("No position weights — cannot compute max drawdown.")
                 return {}
 
             tickers = list(position_weights.keys())
-
-            prices, tickers, weights = self._fetch_price_history(
-                tickers, position_weights, period="252d"
-            )
+            prices, tickers, weights = self._fetch_price_history(tickers, position_weights, period="252d")
             if prices is None:
                 return {}
 
-            # get portfolio value
+            # --- 2. Get current portfolio value ---
             portfolio_value = self.tracker.get_portfolio_value()
             if not portfolio_value or portfolio_value <= 0:
                 logger.warning("Portfolio value is zero or negative.")
                 return {}
 
-            # convert every price cell to Decimal via str()
-            decimal_prices = prices[tickers].apply(
-                lambda col: col.map(lambda x: Decimal(str(x)))
-            )
+            # --- 3. Build a daily portfolio value series ---
+            # Convert prices to Decimal for precision
+            decimal_prices = prices[tickers].applymap(lambda x: Decimal(str(x)))
+            first_prices   = decimal_prices.iloc[0]  # prices on day 1
 
-            # compute daily portfolio index — normalized to 1.0 at start
-            # each day: sum of (price_today / price_day0 * weight)
-            # this tracks how the portfolio value evolves over time
-            first_prices = decimal_prices.iloc[0]
-
-            daily_portfolio_index = decimal_prices.apply(
+            # Each day: weighted sum of (today's price / day-1 price) for each stock
+            # This gives a normalized index (starts at 1.0), then we scale by portfolio value
+            daily_values = decimal_prices.apply(
                 lambda row: sum(
                     (row[t] / first_prices[t]) * weights[i]
-                    for i, t in enumerate(tickers)
-                ),
-                axis=1
-            )
+                    for i, t in enumerate(tickers)),axis=1
+                ) * portfolio_value
 
-            # scale index to actual portfolio value
-            daily_portfolio_values = daily_portfolio_index * portfolio_value
-
-            if daily_portfolio_values.empty:
-                logger.warning("Could not compute daily portfolio values.")
+            if daily_values.empty:
                 return {}
 
-            # track the running peak — highest value seen so far on each day
-            # drawdown on each day = (current value - peak so far) / peak so far
-            peak_value   = daily_portfolio_values.iloc[0]
-            peak_date    = daily_portfolio_values.index[0]
-            trough_value = daily_portfolio_values.iloc[0]
-            trough_date  = daily_portfolio_values.index[0]
-            max_drawdown = Decimal("0")
+            # --- 4. Walk through each day to find the worst drawdown ---
+            peak        = daily_values.iloc[0]   # highest value seen so far
+            peak_date   = daily_values.index[0]
+            max_dd      = Decimal("0")           # worst drawdown seen (negative number)
+            best_peak   = peak                   # peak that led to the worst drawdown
+            best_peak_date   = peak_date
+            trough_val  = peak
+            trough_date = peak_date
 
-            current_peak      = daily_portfolio_values.iloc[0]
-            current_peak_date = daily_portfolio_values.index[0]
+            for date, value in daily_values.items():
+                # Update the running peak if today is a new high
+                if value > peak:
+                    peak      = value
+                    peak_date = date
 
-            for date, value in daily_portfolio_values.items():
-                # update running peak if today is a new high
-                if value > current_peak:
-                    current_peak      = value
-                    current_peak_date = date
+                # Drawdown = how far we've fallen from the peak (will be 0 or negative)
+                drawdown = (value - peak) / peak
 
-                # compute drawdown from running peak to today
-                drawdown = (value - current_peak) / current_peak
+                # Save if this is the deepest drop we've seen
+                if drawdown < max_dd:
+                    max_dd         = drawdown
+                    best_peak      = peak
+                    best_peak_date = peak_date
+                    trough_val     = value
+                    trough_date    = date
 
-                # update max drawdown if this is the worst we have seen
-                if drawdown < max_drawdown:
-                    max_drawdown = drawdown
-                    peak_value   = current_peak
-                    peak_date    = current_peak_date
-                    trough_value = value
-                    trough_date  = date
-
+            # --- 5. Return results ---
             result = {
-                "max_drawdown" : round(max_drawdown, 6),
-                "peak_value"   : round(peak_value,   2),
-                "trough_value" : round(trough_value,  2),
-                "peak_date"    : str(peak_date.date()),
+                "max_drawdown" : round(max_dd,      6),
+                "peak_value"   : round(best_peak,   2),
+                "trough_value" : round(trough_val,  2),
+                "peak_date"    : str(best_peak_date.date()),
                 "trough_date"  : str(trough_date.date()),
             }
 
-            logger.info(
-                f"Max drawdown — drawdown={max_drawdown:.4f}, "
-                f"peak={peak_value:.2f} on {peak_date}, "
-                f"trough={trough_value:.2f} on {trough_date}"
-            )
+            logger.info(f"Max drawdown: {max_dd:.4%} | Peak: {best_peak:.2f} on {best_peak_date} | Trough: {trough_val:.2f} on {trough_date}")
             return result
 
         except Exception as exc:
             logger.error(f"Max drawdown calculation failed: {exc}", exc_info=True)
             return {}
-
     # =========================================================================
     # COMPREHENSIVE REPORTING
     # =========================================================================
@@ -1234,7 +1202,7 @@ if __name__ == "__main__":
     logger.info("\n[TEST 2] Sector concentration")
     sector_conc = calc.get_sector_concentration()
     print(f"Sector HHI: {sector_conc}")
-    """
+    
     logger.info("\n[TEST 3] Position concentration")
     pos_conc = calc.get_concentration_risk()
     print(f"Position risk: {pos_conc}")
@@ -1245,5 +1213,5 @@ if __name__ == "__main__":
 
     logger.info("\n[TEST 5] Full risk report")
     calc.print_risk_report()
-    """
+    
     logger.info("\n✅ ALL TESTS COMPLETED!")
