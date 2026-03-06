@@ -35,6 +35,8 @@ from config import BaseConfig, TradingConfig, RiskConfig
 from data.data_enginner import data_access
 from strategies.strategy_researcher import strategy_engine
 from risk.risk_manager import risk_manager
+from strategies.momentum_strategy import MomentumStrategy
+from system.signal_aggregator import SignalAggregator  
 from logger import setup_logging, get_logger
 
 setup_logging()
@@ -59,12 +61,14 @@ class TradingSystem:
         log.info("  TRADING SYSTEM INITIALIZING")
         log.info("=" * 60)
 
-        # Validate environment
+        
         BaseConfig.validate()
 
         # Core components
         self.data     = data_access
         self.strategy = strategy_engine
+        self.momentum_strategy = MomentumStrategy()
+        self.aggregator = SignalAggregator()
         self.risk     = risk_manager
         self.config   = TradingConfig()
         self.rconfig  = RiskConfig()
@@ -273,60 +277,111 @@ class TradingSystem:
 
     def analyze_single_stock(self, ticker):
         """
-        Full analysis pipeline for one ticker:
-            data → RSI signal → AI signal → combine → risk check → execute
+        Analyze stock using ALL enabled strategies.
 
-        Returns:
-            dict: Result with keys: ticker, action, status, signal, approval
+        Automatically detects and uses:
+        - RSI Strategy (always enabled)
+        - Momentum Strategy (if exists)
+        - AI/TradingAgents (if enabled)
+        - Any future strategies you add
+
+        Parameters
+        ----------
+        ticker : str
+            Stock symbol to analyze
+
+        Returns
+        -------
+        dict : Combined signal from all strategies
         """
-        log.info(f"\n{'─'*50}")
-        log.info(f"📊 Analyzing {ticker}")
+        log.info(f"🔍 Analyzing {ticker}")
 
-        # ── 1. Fetch price data ───────────────────────────────
-        price_data = self.data.get_price_history(ticker, days=90)
+        try:
+            # ── 1. Get Price Data ──────────────────────────────────
+            df = data_access.get_price_history(ticker, days=90)
 
-        if price_data is None or price_data.empty:
-            log.error(f"   No data for {ticker}")
-            return self._result(ticker, 'HOLD', 'NO_DATA', 'No price data available')
+            if df is None or df.empty:
+                log.warning(f"   ⚠️  No data for {ticker}")
+                return None
 
-        # ── 2. RSI strategy signal ────────────────────────────
-        rsi_signal = self.strategy.analyze(ticker, price_data)
+            # ── 2. Collect Signals from ALL Strategies ─────────────
+            signals = []
 
-        if rsi_signal is None:
-            log.error(f"   RSI strategy failed for {ticker}")
-            return self._result(ticker, 'HOLD', 'ERROR', 'Strategy failed')
-
-        log.info(f"   RSI signal:  {rsi_signal['action']} "
-                 f"(confidence={rsi_signal['confidence']:.0%}, "
-                 f"RSI={rsi_signal.get('rsi', '?')})")
-
-        # ── 3. AI signal (optional) ───────────────────────────
-        ta_signal = None
-        if self.ta and self.config.USE_TRADING_AGENT:
+            # RSI Signal (always enabled)
             try:
-                ta_signal = self.ta.analyze(ticker)
-                log.info(f"   AI signal:   {ta_signal['action']} "
-                         f"(confidence={ta_signal.get('confidence', 0):.0%})")
+                rsi_signal = self.rsi_strategy.analyze(ticker, df)
+                log.info(f"   📊 RSI: {rsi_signal['action']} @ {rsi_signal['confidence']}%")
+                signals.append(rsi_signal)
             except Exception as e:
-                log.warning(f"   AI signal failed for {ticker}: {e}. Using RSI only.")
+                log.warning(f"   ⚠️  RSI failed: {e}")
 
-        # ── 4. Combine signals ────────────────────────────────
-        final_signal = self._combine_signals(rsi_signal, ta_signal)
-        log.info(f"   Final:       {final_signal['action']} "
-                 f"(confidence={final_signal['confidence']:.0%})")
-        log.info(f"   Reasoning:   {final_signal['reasoning'][:80]}...")
+            # Momentum Signal (if exists)
+            if hasattr(self, 'momentum_strategy'):
+                try:
+                    momentum_signal = self.momentum_strategy.analyze(ticker, df)
+                    log.info(f"   📊 Momentum: {momentum_signal['action']} @ {momentum_signal['confidence']}%")
+                    signals.append(momentum_signal)
+                except Exception as e:
+                    log.warning(f"   ⚠️  Momentum failed: {e}")
 
-        # ── 5. Route by action ────────────────────────────────
-        if final_signal['action'] == 'BUY':
-            return self._handle_buy(ticker, final_signal)
+            # AI Signal (if TradingAgents enabled)
+            if self.use_trading_agents:
+                try:
+                    ai_signal = self._get_trading_agents_signal(ticker)
+                    if ai_signal:
+                        log.info(f"   🤖 AI: {ai_signal['action']} @ {ai_signal['confidence']}%")
+                        signals.append(ai_signal)
+                except Exception as e:
+                    log.warning(f"   ⚠️  AI failed: {e}")
 
-        elif final_signal['action'] == 'SELL':
-            return self._handle_sell(ticker, final_signal)
+            # Mean Reversion Signal (if you add it in future)
+            if hasattr(self, 'mean_reversion_strategy'):
+                try:
+                    mr_signal = self.mean_reversion_strategy.analyze(ticker, df)
+                    log.info(f"   📊 Mean Reversion: {mr_signal['action']} @ {mr_signal['confidence']}%")
+                    signals.append(mr_signal)
+                except Exception as e:
+                    log.warning(f"   ⚠️  Mean Reversion failed: {e}")
 
-        else:  # HOLD
-            return self._result(ticker, 'HOLD', 'NO_ACTION', final_signal['reasoning'],
-                                signal=final_signal)
+            # MACD Signal (if you add it in future)
+            if hasattr(self, 'macd_strategy'):
+                try:
+                    macd_signal = self.macd_strategy.analyze(ticker, df)
+                    log.info(f"   📊 MACD: {macd_signal['action']} @ {macd_signal['confidence']}%")
+                    signals.append(macd_signal)
+                except Exception as e:
+                    log.warning(f"   ⚠️  MACD failed: {e}")
 
+            # ── 3. Validate We Have Signals ────────────────────────
+            if not signals:
+                log.error(f"   ❌ No strategies returned signals for {ticker}")
+                return None
+
+            # ── 4. Combine Signals Using Aggregator ────────────────
+            if len(signals) == 1:
+                # Only one strategy (just RSI)
+                combined = signals[0]
+                log.info(f"   📊 Single strategy: {combined['action']} @ {combined['confidence']}%")
+
+            elif len(signals) == 2:
+                # Two strategies (e.g., RSI + Momentum)
+                combined = self.aggregator.combine_two(signals[0], signals[1])
+                log.info(f"   🎯 Combined (2): {combined['action']} @ {combined['confidence']}%")
+
+            else:
+                # Three or more strategies
+                combined = self.aggregator.combine_multiple(signals)
+                log.info(f"   🎯 Combined ({len(signals)}): {combined['action']} @ {combined['confidence']}%")
+
+            # Log reasoning
+            log.info(f"   📝 {combined['reasoning']}")
+
+            return combined
+
+        except Exception as e:
+            log.error(f"   ❌ Analysis failed for {ticker}: {e}")
+            return None
+    
     # ── Buy handler ──────────────────────────────────────────────
     def _handle_buy(self, ticker, signal):
         """Process a BUY signal through risk checks and execution."""
