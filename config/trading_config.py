@@ -10,7 +10,7 @@ class TradingConfig:
 
     # Trading hours
     MARKET_OPEN = "09:30"
-    MAFKET_CLOSE = "16:00"
+    MARKET_CLOSE = "16:00"
 
     # Defualt strategy
     DEFAULT_STRATEGY = "rsi_mean_reversion"

@@ -93,7 +93,7 @@ class RSIStrategy:
         
         elif current_rsi > self.rsi_sell:
             # OVERBOUGHT - SELL signal
-            signal = self._sell_signal(ticker, current_price, current_rsi)
+            signal = self._sell_signal(ticker, current_price, current_rsi, price_data)
         
         else:
             # NEUTRAL - HOLD

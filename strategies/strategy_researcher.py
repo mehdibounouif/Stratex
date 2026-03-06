@@ -3,6 +3,7 @@ import numpy as np
 from config import TradingConfig
 from logger import get_logger, setup_logging
 from strategies.rsi_strategy import rsi_strategy
+from strategies.momentum_strategy import momentum_strategy
 
 setup_logging()
 logging = get_logger("strategies.strategy_researcher")
@@ -16,7 +17,7 @@ class StrategyResearcher:
         # Register all strategies
         self.strategies = {
             'rsi_mean_reversion': rsi_strategy,
-            # 'momentum': momentum_strategy,
+            'momentum': momentum_strategy,
             # 'earnings': earnings_strategy,
         }
              

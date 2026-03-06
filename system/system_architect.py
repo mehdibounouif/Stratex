@@ -67,7 +67,6 @@ class TradingSystem:
         # Core components
         self.data     = data_access
         self.strategy = strategy_engine
-        self.momentum_strategy = MomentumStrategy()
         self.aggregator = SignalAggregator()
         self.risk     = risk_manager
         self.config   = TradingConfig()
@@ -309,7 +308,7 @@ class TradingSystem:
 
             # RSI Signal (always enabled)
             try:
-                rsi_signal = self.rsi_strategy.analyze(ticker, df)
+                rsi_signal = self.strategy.analyze(ticker, df)
                 log.info(f"   📊 RSI: {rsi_signal['action']} @ {rsi_signal['confidence']}%")
                 signals.append(rsi_signal)
             except Exception as e:
@@ -325,9 +324,9 @@ class TradingSystem:
                     log.warning(f"   ⚠️  Momentum failed: {e}")
 
             # AI Signal (if TradingAgents enabled)
-            if self.use_trading_agents:
+            if self.ta:
                 try:
-                    ai_signal = self._get_trading_agents_signal(ticker)
+                    ai_signal = self.ta.analyze(ticker)
                     if ai_signal:
                         log.info(f"   🤖 AI: {ai_signal['action']} @ {ai_signal['confidence']}%")
                         signals.append(ai_signal)
@@ -502,56 +501,56 @@ class TradingSystem:
     # STEP 3b — COMBINE SIGNALS
     # ================================================================
 
-    def _combine_signals(self, rsi_signal, ta_signal=None):
-        """
-        Merge RSI signal and AI signal into one final decision.
-
-        Rules:
-        - Only RSI available → use RSI signal as-is
-        - Both agree (same action) → boost confidence, use combined reasoning
-        - Both disagree → HOLD (conflict, wait for clarity)
-        - One says HOLD → defer to the other but lower confidence
-
-        Returns:
-            dict: Same signal format as rsi_signal
-        """
-        # No AI signal — use RSI directly
-        if ta_signal is None or ta_signal.get('action') is None:
-            rsi_signal['source'] = 'RSI_ONLY'
-            return rsi_signal
-
-        rsi_action = rsi_signal.get('action', 'HOLD')
-        ta_action  = ta_signal.get('action', 'HOLD')
-        rsi_conf   = rsi_signal.get('confidence', 0.5)
-        ta_conf    = ta_signal.get('confidence', 0.5)
-
-        # ── Both agree ────────────────────────────────────────
-        if rsi_action == ta_action:
-            # Boost confidence when both models agree
-            combined_conf = min(0.95, (rsi_conf + ta_conf) / 2 + 0.10)
-            return {
-                **rsi_signal,
-                'confidence': combined_conf,
-                'source':     'RSI+AI_AGREE',
-                'reasoning':  (f"[RSI] {rsi_signal.get('reasoning', '')} "
-                               f"| [AI] {ta_signal.get('reasoning', '')}"),
-            }
-
-        # ── One says HOLD ─────────────────────────────────────
-        if rsi_action == 'HOLD':
-            return {**ta_signal, 'confidence': ta_conf * 0.8, 'source': 'AI_ONLY_LOW'}
-        if ta_action == 'HOLD':
-            return {**rsi_signal, 'confidence': rsi_conf * 0.8, 'source': 'RSI_ONLY_LOW'}
-
-        # ── Direct conflict (BUY vs SELL) ─────────────────────
-        log.info(f"   ⚠️  Signal conflict: RSI={rsi_action} vs AI={ta_action} → HOLD")
-        return {
-            **rsi_signal,
-            'action':     'HOLD',
-            'confidence': 0.30,
-            'source':     'CONFLICT_HOLD',
-            'reasoning':  f'Conflicting signals: RSI={rsi_action}, AI={ta_action}. Waiting for clarity.',
-        }
+#    def _combine_signals(self, rsi_signal, ta_signal=None):
+#        """
+#        Merge RSI signal and AI signal into one final decision.
+#
+#        Rules:
+#        - Only RSI available → use RSI signal as-is
+#        - Both agree (same action) → boost confidence, use combined reasoning
+#        - Both disagree → HOLD (conflict, wait for clarity)
+#        - One says HOLD → defer to the other but lower confidence
+#
+#        Returns:
+#            dict: Same signal format as rsi_signal
+#        """
+#        # No AI signal — use RSI directly
+#        if ta_signal is None or ta_signal.get('action') is None:
+#            rsi_signal['source'] = 'RSI_ONLY'
+#            return rsi_signal
+#
+#        rsi_action = rsi_signal.get('action', 'HOLD')
+#        ta_action  = ta_signal.get('action', 'HOLD')
+#        rsi_conf   = rsi_signal.get('confidence', 0.5)
+#        ta_conf    = ta_signal.get('confidence', 0.5)
+#
+#        # ── Both agree ────────────────────────────────────────
+#        if rsi_action == ta_action:
+#            # Boost confidence when both models agree
+#            combined_conf = min(0.95, (rsi_conf + ta_conf) / 2 + 0.10)
+#            return {
+#                **rsi_signal,
+#                'confidence': combined_conf,
+#                'source':     'RSI+AI_AGREE',
+#                'reasoning':  (f"[RSI] {rsi_signal.get('reasoning', '')} "
+#                               f"| [AI] {ta_signal.get('reasoning', '')}"),
+#            }
+#
+#        # ── One says HOLD ─────────────────────────────────────
+#        if rsi_action == 'HOLD':
+#            return {**ta_signal, 'confidence': ta_conf * 0.8, 'source': 'AI_ONLY_LOW'}
+#        if ta_action == 'HOLD':
+#            return {**rsi_signal, 'confidence': rsi_conf * 0.8, 'source': 'RSI_ONLY_LOW'}
+#
+#        # ── Direct conflict (BUY vs SELL) ─────────────────────
+#        log.info(f"   ⚠️  Signal conflict: RSI={rsi_action} vs AI={ta_action} → HOLD")
+#        return {
+#            **rsi_signal,
+#            'action':     'HOLD',
+#            'confidence': 0.30,
+#            'source':     'CONFLICT_HOLD',
+#            'reasoning':  f'Conflicting signals: RSI={rsi_action}, AI={ta_action}. Waiting for clarity.',
+#        }
 
     # ================================================================
     # STEP 3c — SCAN WATCHLIST
