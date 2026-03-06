@@ -31,6 +31,7 @@ CRITICAL IMPROVEMENTS FROM ORIGINAL:
 Author: Kawtar (Risk Manager) + Claude (Code Review)
 """
 
+
 import pandas as pd
 import json
 from config.base_config import BaseConfig
@@ -42,8 +43,15 @@ from decimal import Decimal, ROUND_HALF_UP
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 import shutil
-import fcntl  # NEW: File locking for thread safety
 import tempfile  # NEW: Atomic file writes
+import threading  # Cross-platform thread safety
+
+
+try:
+    import fcntl  # Unix/Linux/macOS only
+    _FCNTL_AVAILABLE = True
+except ImportError:
+    _FCNTL_AVAILABLE = False  # Windows fallback — use threading.Lock instead
 
 # ══════════════════════════════════════════════════════════════
 # POSITION DATA CLASS
@@ -687,7 +695,8 @@ class PositionTracker:
     # ══════════════════════════════════════════════════════════
     # PRIVATE — FILE OPERATIONS (ATOMIC & THREAD-SAFE)
     # ══════════════════════════════════════════════════════════
-    
+
+
     def _file_lock(self, operation: str):
         """
         NEW: Context manager for file locking.
@@ -698,19 +707,26 @@ class PositionTracker:
             def __init__(self, lock_path):
                 self.lock_path = lock_path
                 self.lock_file = None
-            
+                self._thread_lock = threading.Lock()
+
             def __enter__(self):
-                self.lock_file = open(self.lock_path, 'w')
-                fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_EX)
+                self._thread_lock.acquire()
+                if _FCNTL_AVAILABLE:
+                    # Unix: real cross-process file lock
+                    self.lock_file = open(self.lock_path, 'w')
+                    fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_EX)
+                # Windows: threading.Lock() above is sufficient for single-process use
                 return self
-            
+
             def __exit__(self, exc_type, exc_val, exc_tb):
-                if self.lock_file:
+                if _FCNTL_AVAILABLE and self.lock_file:
                     fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_UN)
                     self.lock_file.close()
+                self._thread_lock.release()
         
         lock_path = os.path.join(self.lock_dir, f'{operation}.lock')
         return FileLock(lock_path)
+
     
     def _atomic_write(self, filepath: str, content: str):
         """
