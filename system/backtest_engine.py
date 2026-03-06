@@ -10,8 +10,7 @@ ARCHITECTURE:
 - Compatible with your caching system
 - Same pattern as rest of project
 
-Author: Trading System
-Compatible with: rsi_strategy.py, momentum_strategy.py, signal_aggregator.py
+Author: Mehdi
 """
 
 import pandas as pd

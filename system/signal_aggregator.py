@@ -5,8 +5,7 @@ Signal Aggregator - Combines Multiple Trading Signals
 Resolves conflicts between RSI, Momentum, AI, and other signal sources
 with intelligent conflict resolution and confidence scoring.
 
-Author: Trading System
-Compatible with: system_architect.py, rsi_strategy.py, momentum_strategy.py
+Author: Mehdi
 """
 
 from logger import get_logger, setup_logging

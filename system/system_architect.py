@@ -23,7 +23,7 @@ Daily flow:
         │           └── _execute_trade()                  ← tracker.add_position()
         └── save_daily_report()
 
-Author: Mehdi (System Architect)
+Author: Mehdi 
 """
 
 import os
