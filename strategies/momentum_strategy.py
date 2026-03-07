@@ -14,12 +14,13 @@ import pandas as pd
 from decimal import Decimal
 import numpy as np
 from logger import get_logger, setup_logging
+from strategies.base_strategy import BaseStrategy
 
 setup_logging()
 log = get_logger('strategies.momentum_strategy')
 
 
-class MomentumStrategy:
+class MomentumStrategy(BaseStrategy):
     """
     Momentum-based trading strategy.
     
@@ -76,7 +77,7 @@ class MomentumStrategy:
         log.info(f"   Data source: {'data_access singleton' if data_access else 'imported'}")
     
 
-    def analyze(self, ticker, df=None):
+    def generate_signal(self, ticker: str, price_data=None) -> dict:
         """
         Analyze a stock's momentum and generate a signal.
 
@@ -166,7 +167,7 @@ class MomentumStrategy:
         }
         """
 
-    def _calculate_indicators(self, df):
+    def _calculate_indicators(self, df: pd.DataFrame) -> dict:
         """
         Compute technical indicators used by the strategy.
 
@@ -376,7 +377,7 @@ class MomentumStrategy:
             log.error(f"❌ Failed to pack indicators dict: {e}")
             return {}
 
-    def _generate_signal(self, ticker, indicators):
+    def _generate_signal(self, ticker: str, ind: dict) -> dict:
         """
         Convert indicator values into a trading signal.
 
@@ -526,85 +527,3 @@ if __name__ == "__main__":
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-"""
-if __name__ == "__main__":
-    print("\n" + "="*60)
-    print("MOMENTUM STRATEGY DEMO")
-    print("="*60)
-    
-    # Create strategy (will use data_access singleton)
-    strategy = MomentumStrategy(
-        roc_period=20,
-        roc_threshold=5.0,
-        fast_ma=10,
-        slow_ma=30,
-        price_ma=50
-    )
-    
-    # Test on real data using data_access
-    print("\n🎯 Testing on AAPL using data_access...")
-    ticker = "AAPL"
-    
-    try:
-        # This will use data_access to get cached or fetch fresh data
-        signal = strategy.analyze(ticker)
-        
-        # Print results
-        print("\n" + "="*60)
-        print("MOMENTUM ANALYSIS RESULTS")
-        print("="*60)
-        print(f"Ticker:     {ticker}")
-        print(f"Action:     {signal['action']}")
-        print(f"Confidence: {signal['confidence']}%")
-        print(f"Reasoning:  {signal['reasoning']}")
-        
-        if signal['indicators']:
-            print("\nIndicators:")
-            for key, value in signal['indicators'].items():
-                print(f"  {key}: {value}")
-        
-    except Exception as e:
-        print(f"\n❌ Test failed: {e}")
-        print("\nNote: If Yahoo Finance is rate-limited, this is expected.")
-        print("The strategy will work fine with cached data in production.")
-    
-    print("\n✅ Demo complete")
-    print("\nUsage in your system:")
-    print("  from strategies.momentum_strategy import MomentumStrategy")
-    print("  momentum = MomentumStrategy()")
-    print("  signal = momentum.analyze('AAPL')")
-    print("\nThe strategy automatically uses your data_access singleton!")
-    print("No direct yfinance calls - fully integrated with your architecture.")
-"""
