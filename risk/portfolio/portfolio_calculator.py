@@ -42,15 +42,18 @@ class PortfolioCalculator:
     HHI_HIGH   = Decimal("0.25")
     HHI_MEDIUM = Decimal("0.15")
 
-    def __init__(self, tracker=None):
+    def __init__(self, tracker=None, data_access=None):
         """
         Initialize Portfolio Calculator.
-        
+
         Parameters
         ----------
         tracker : PositionTracker, optional
             Portfolio tracker instance providing positions,
             prices, and historical portfolio data.
+        data_access : DataEngineer, optional
+            Data access singleton for fetching price history through
+            the cache layer. If None, falls back to direct yfinance.
         """
         if tracker is None:
             try:
@@ -79,6 +82,19 @@ class PortfolioCalculator:
                 f"got {type(tracker.positions).__name__}"
                 )
         self.tracker = tracker
+
+        # Data access — prefer injected instance, fall back to singleton, then raw yfinance
+        if data_access is not None:
+            self._data_access = data_access
+        else:
+            try:
+                from data.data_engineer import data_access as _da
+                self._data_access = _da
+                logger.debug("PortfolioCalculator using data_engineer singleton for price fetching")
+            except Exception:
+                self._data_access = None
+                logger.warning("data_engineer unavailable — portfolio calculator will use direct yfinance")
+
         try:
             self.sector_map = self._load_sector_map()
         except Exception as exc:
@@ -275,17 +291,30 @@ class PortfolioCalculator:
             return self.sector_map[ticker]
 
         try:
-            stock  = yf.Ticker(ticker)
-            info   = stock.info or {}
+            # Try data_access first if available (it may cache sector info)
+            info = {}
+            if self._data_access is not None and hasattr(self._data_access, 'get_fundamentals'):
+                try:
+                    fundamentals = self._data_access.get_fundamentals(ticker)
+                    if fundamentals and isinstance(fundamentals, dict):
+                        info = fundamentals
+                except Exception:
+                    pass
+
+            # Fall back to direct yfinance if data_access didn't provide sector
+            if not info.get('sector'):
+                stock  = yf.Ticker(ticker)
+                info   = stock.info or {}
+
             sector = info.get("sector")
 
             if sector and isinstance(sector, str) and sector.strip():
                 sector = sector.strip()
                 self.sector_map[ticker] = sector
-                logger.debug(f"yfinance resolved {ticker} → {sector}")
+                logger.debug(f"Resolved {ticker} → sector: {sector}")
                 return sector
             else:
-                logger.warning(f"No sector found for {ticker} via yfinance — defaulting to 'Other'")
+                logger.warning(f"No sector found for {ticker} — defaulting to 'Other'")
 
         except Exception as exc:
             logger.warning(f"yfinance lookup failed for {ticker}: {exc}")
@@ -574,35 +603,60 @@ class PortfolioCalculator:
             Returns (None, None, None) on any failure.
         """
         try:
-            raw = yf.download(tickers, period=period, auto_adjust=True, progress=False)
+            # ── Prefer data_access cache layer ────────────────────
+            if self._data_access is not None:
+                all_prices = {}
+                missing_tickers = []
+                for t in tickers:
+                    try:
+                        # Convert yfinance period string to days integer
+                        period_days = 252 if '1y' in period else int(''.join(filter(str.isdigit, period)) or 252)
+                        df = self._data_access.get_price_history(t, days=period_days)
+                        if df is not None and not df.empty and 'Close' in df.columns:
+                            all_prices[t] = df['Close']
+                        else:
+                            missing_tickers.append(t)
+                    except Exception:
+                        missing_tickers.append(t)
 
-            if isinstance(raw.columns, pd.MultiIndex):
-                prices = raw["Close"]
+                if missing_tickers:
+                    logger.warning(f"No price data via cache for: {missing_tickers}")
+
+                valid_tickers = [t for t in tickers if t in all_prices]
+                if not valid_tickers:
+                    logger.error("No valid price data from cache for any ticker.")
+                    return None, None, None
+
+                prices = pd.DataFrame(all_prices)
+                prices = prices.dropna(axis=1, how='all')
+
             else:
-                prices = raw[["Close"]]
-                prices.columns = tickers
+                # ── Fallback: direct yfinance (no cache) ──────────
+                logger.debug("Falling back to direct yfinance download (no cache available)")
+                raw = yf.download(tickers, period=period, auto_adjust=True, progress=False)
+                if isinstance(raw.columns, pd.MultiIndex):
+                    prices = raw["Close"]
+                else:
+                    prices = raw[["Close"]]
+                    prices.columns = tickers
+                if prices.empty:
+                    logger.warning("yfinance returned empty price data.")
+                    return None, None, None
+                prices = prices.dropna(axis=1, how="all")
 
-            if prices.empty:
-                logger.warning("yfinance returned empty price data.")
-                return None, None, None
-
-            # drop tickers with entirely missing data
-            prices = prices.dropna(axis=1, how="all")
-
-            # handle missing tickers — rebuild and renormalize weights
+            # Rebuild tickers list and renormalize weights after any drops
+            valid_tickers = [t for t in tickers if t in prices.columns]
             missing = [t for t in tickers if t not in prices.columns]
             if missing:
                 logger.warning(f"Missing price data for: {missing} — excluding.")
-                tickers = [t for t in tickers if t in prices.columns]
-                if not tickers:
-                    logger.error("No valid price data returned for any ticker.")
-                    return None, None, None
-                total   = sum(position_weights[t] for t in tickers)
-                weights = [position_weights[t] / total for t in tickers]
-            else:
-                weights = [position_weights[t] for t in tickers]
+            if not valid_tickers:
+                logger.error("No valid price data returned for any ticker.")
+                return None, None, None
 
-            return prices, tickers, weights
+            total   = sum(position_weights[t] for t in valid_tickers)
+            weights = [position_weights[t] / total for t in valid_tickers]
+
+            return prices[valid_tickers], valid_tickers, weights
 
         except Exception as exc:
             logger.error(f"Price history fetch failed: {exc}", exc_info=True)
