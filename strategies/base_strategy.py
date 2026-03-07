@@ -1,5 +1,5 @@
 """
-Base class for all trading strategies in Quant_firm.
+Base class for all trading strategies.
 
 Every strategy must inherit this class and implement generate_signal().
 This enforces a single, consistent signal contract across the system.
