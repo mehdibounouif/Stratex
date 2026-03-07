@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 
 from logger import setup_logging, get_logger
-from data.data_enginner import data_access
+from data.data_engineer import data_access
 
 # --------------------------------------------------
 # Logging setup

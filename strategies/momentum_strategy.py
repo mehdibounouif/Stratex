@@ -64,7 +64,7 @@ class MomentumStrategy:
         self.price_ma = price_ma
 
         if data_access is None:
-            from data.data_enginner import data_access
+            from data.data_engineer import data_access
             self.data_access = data_access
         else:
             self.data_access = data_access
@@ -445,7 +445,7 @@ class MomentumStrategy:
         }
         """
 
-
+momentum_strategy = MomentumStrategy()
 # ══════════════════════════════════════════════════════════════
 # DEMO & TESTING
 # ══════════════════════════════════════════════════════════════

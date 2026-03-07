@@ -4,7 +4,7 @@ Test your system using ONLY cached data (no API calls).
 This proves your system works even when APIs are unavailable.
 """
 
-from data.data_enginner import data_access
+from data.data_engineer import data_access
 from strategies.rsi_strategy import RSIStrategy
 import pandas as pd
 

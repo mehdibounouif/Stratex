@@ -1,7 +1,7 @@
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 from config import BaseConfig, TradingConfig
-from data.data_enginner import data_access
+from data.data_engineer import data_access
 from datetime import datetime
 import json
 import os

@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime
-from data.data_enginner import data_access
+from data.data_engineer import data_access
 import json
 import os
 from logger import setup_logging, get_logger
@@ -93,7 +93,7 @@ class RSIStrategy:
         
         elif current_rsi > self.rsi_sell:
             # OVERBOUGHT - SELL signal
-            signal = self._sell_signal(ticker, current_price, current_rsi)
+            signal = self._sell_signal(ticker, current_price, current_rsi, price_data)
         
         else:
             # NEUTRAL - HOLD

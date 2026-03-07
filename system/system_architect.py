@@ -23,7 +23,7 @@ Daily flow:
         │           └── _execute_trade()                  ← tracker.add_position()
         └── save_daily_report()
 
-Author: Mehdi (System Architect)
+Author: Mehdi 
 """
 
 import os
@@ -32,9 +32,10 @@ from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
 from config import BaseConfig, TradingConfig, RiskConfig
-from data.data_enginner import data_access
-from strategies.strategy_researcher import strategy_engine
+from data.data_engineer import data_access
+from strategies.strategy_researcher import strategy_engine   # owns ALL strategy instances
 from risk.risk_manager import risk_manager
+from system.signal_aggregator import SignalAggregator
 from logger import setup_logging, get_logger
 
 setup_logging()
@@ -59,15 +60,16 @@ class TradingSystem:
         log.info("  TRADING SYSTEM INITIALIZING")
         log.info("=" * 60)
 
-        # Validate environment
+        
         BaseConfig.validate()
 
         # Core components
-        self.data     = data_access
-        self.strategy = strategy_engine
-        self.risk     = risk_manager
-        self.config   = TradingConfig()
-        self.rconfig  = RiskConfig()
+        self.data       = data_access
+        self.strategy   = strategy_engine   # StrategyResearcher owns ALL strategies
+        self.aggregator = SignalAggregator()
+        self.risk       = risk_manager
+        self.config     = TradingConfig()
+        self.rconfig    = RiskConfig()
 
         # TradingAgents (AI signal) — optional
         self.ta = None
@@ -273,230 +275,360 @@ class TradingSystem:
 
     def analyze_single_stock(self, ticker):
         """
-        Full analysis pipeline for one ticker:
-            data → RSI signal → AI signal → combine → risk check → execute
+        Analyze stock using ALL enabled strategies.
 
-        Returns:
-            dict: Result with keys: ticker, action, status, signal, approval
+        Automatically detects and uses:
+        - RSI Strategy (always enabled)
+        - Momentum Strategy (if exists)
+        - AI/TradingAgents (if enabled)
+        - Any future strategies you add
+
+        Parameters
+        ----------
+        ticker : str
+            Stock symbol to analyze
+
+        Returns
+        -------
+        dict : Combined signal from all strategies
         """
-        log.info(f"\n{'─'*50}")
-        log.info(f"📊 Analyzing {ticker}")
+        log.info(f"🔍 Analyzing {ticker}")
 
-        # ── 1. Fetch price data ───────────────────────────────
-        price_data = self.data.get_price_history(ticker, days=90)
+        try:
+            # ── 1. Get Price Data ──────────────────────────────────
+            df = data_access.get_price_history(ticker, days=90)
 
-        if price_data is None or price_data.empty:
-            log.error(f"   No data for {ticker}")
-            return self._result(ticker, 'HOLD', 'NO_DATA', 'No price data available')
+            if df is None or df.empty:
+                log.warning(f"   ⚠️  No data for {ticker}")
+                return None
 
-        # ── 2. RSI strategy signal ────────────────────────────
-        rsi_signal = self.strategy.analyze(ticker, price_data)
+            # ── 2. Collect Signals from ALL Strategies ─────────────
+            signals = []
 
-        if rsi_signal is None:
-            log.error(f"   RSI strategy failed for {ticker}")
-            return self._result(ticker, 'HOLD', 'ERROR', 'Strategy failed')
-
-        log.info(f"   RSI signal:  {rsi_signal['action']} "
-                 f"(confidence={rsi_signal['confidence']:.0%}, "
-                 f"RSI={rsi_signal.get('rsi', '?')})")
-
-        # ── 3. AI signal (optional) ───────────────────────────
-        ta_signal = None
-        if self.ta and self.config.USE_TRADING_AGENT:
+            # RSI Signal (always enabled)
             try:
-                ta_signal = self.ta.analyze(ticker)
-                log.info(f"   AI signal:   {ta_signal['action']} "
-                         f"(confidence={ta_signal.get('confidence', 0):.0%})")
+                rsi_signal = self.strategy.analyze(ticker, df, 'rsi_mean_reversion')
+                log.info(f"   📊 RSI: {rsi_signal['action']} @ {rsi_signal['confidence']:.0%}")
+                signals.append(rsi_signal)
             except Exception as e:
-                log.warning(f"   AI signal failed for {ticker}: {e}. Using RSI only.")
+                log.warning(f"   ⚠️  RSI failed: {e}")
 
-        # ── 4. Combine signals ────────────────────────────────
-        final_signal = self._combine_signals(rsi_signal, ta_signal)
-        log.info(f"   Final:       {final_signal['action']} "
-                 f"(confidence={final_signal['confidence']:.0%})")
-        log.info(f"   Reasoning:   {final_signal['reasoning'][:80]}...")
+            # Momentum Signal (if registered in strategy_engine)
+            if 'momentum' in self.strategy.strategies:
+                try:
+                    momentum_signal = self.strategy.analyze(ticker, df, 'momentum')
+                    log.info(f"   📊 Momentum: {momentum_signal['action']} @ {momentum_signal['confidence']:.0%}")
+                    signals.append(momentum_signal)
+                except Exception as e:
+                    log.warning(f"   ⚠️  Momentum failed: {e}")
 
-        # ── 5. Route by action ────────────────────────────────
-        if final_signal['action'] == 'BUY':
-            return self._handle_buy(ticker, final_signal)
+            # AI Signal (if TradingAgents enabled and loaded successfully)
+            if self.ta is not None:
+                try:
+                    ai_signal = self.ta.analyze(ticker)
+                    if ai_signal:
+                        log.info(f"   🤖 AI: {ai_signal['action']} @ {ai_signal['confidence']:.0%}")
+                        signals.append(ai_signal)
+                except Exception as e:
+                    log.warning(f"   ⚠️  AI failed: {e}")
 
-        elif final_signal['action'] == 'SELL':
-            return self._handle_sell(ticker, final_signal)
+            # Future strategies — add them to StrategyResearcher registry and they
+            # will be picked up automatically here without touching this file.
+            for strategy_name in self.strategy.list_strategies():
+                if strategy_name in ('rsi_mean_reversion', 'momentum'):
+                    continue  # already handled above
+                try:
+                    extra_signal = self.strategy.analyze(ticker, df, strategy_name)
+                    log.info(f"   📊 {strategy_name}: {extra_signal['action']} @ {extra_signal['confidence']:.0%}")
+                    signals.append(extra_signal)
+                except Exception as e:
+                    log.warning(f"   ⚠️  {strategy_name} failed: {e}")
 
-        else:  # HOLD
-            return self._result(ticker, 'HOLD', 'NO_ACTION', final_signal['reasoning'],
-                                signal=final_signal)
+            # ── 3. Validate We Have Signals ────────────────────────
+            if not signals:
+                log.error(f"   ❌ No strategies returned signals for {ticker}")
+                return None
 
+            # ── 4. Combine Signals Using Aggregator ────────────────
+            if len(signals) == 1:
+                combined = signals[0]
+                log.info(f"   📊 Single strategy: {combined['action']} @ {combined['confidence']:.0%}")
+
+            elif len(signals) == 2:
+                combined = self.aggregator.combine_two(signals[0], signals[1])
+                log.info(f"   🎯 Combined (2): {combined['action']} @ {combined['confidence']:.0%}")
+
+            else:
+                combined = self.aggregator.combine_multiple(signals)
+                log.info(f"   🎯 Combined ({len(signals)}): {combined['action']} @ {combined['confidence']:.0%}")
+
+            # ── 5. Ensure current_price is always present ──────────
+            # SignalAggregator may not preserve current_price when merging.
+            # Fall back to the first signal's price (they all use same data).
+            if 'current_price' not in combined or not combined.get('current_price'):
+                for s in signals:
+                    if s.get('current_price'):
+                        combined['current_price'] = s['current_price']
+                        break
+
+            if not combined.get('current_price'):
+                log.warning(f"   ⚠️  No current_price in combined signal for {ticker} — fetching live")
+                live_price = self.data.get_latest_price(ticker)
+                combined['current_price'] = float(live_price) if live_price else 0.0
+
+            # Log reasoning
+            log.info(f"   📝 {combined.get('reasoning', '')}")
+
+            # ── 6. Confidence gate ─────────────────────────────────
+            # Reject weak signals before they reach the risk manager.
+            # Confidence is stored as a 0.0–1.0 float.
+            confidence    = combined.get('confidence', 0.0)
+            min_confidence = self.config.MIN_SIGNAL_CONFIDENCE
+
+            if confidence < min_confidence:
+                log.info(
+                    f"   ⏸️  LOW CONFIDENCE: {confidence:.0%} < {min_confidence:.0%} minimum — HOLD"
+                )
+                return self._result(
+                    ticker, 'HOLD', 'LOW_CONFIDENCE',
+                    f"Signal confidence {confidence:.0%} below minimum {min_confidence:.0%}",
+                    signal=combined
+                )
+
+            # ── 7. Route to trade execution ────────────────────────
+            action = combined.get('action', 'HOLD')
+
+            if action == 'BUY':
+                return self._handle_buy(ticker, combined)
+            elif action == 'SELL':
+                return self._handle_sell(ticker, combined)
+            else:
+                log.info(f"   ⏸️  HOLD — no trade executed for {ticker}")
+                return self._result(ticker, 'HOLD', 'SIGNAL_HOLD',
+                                    combined.get('reasoning', 'Strategy says HOLD'),
+                                    signal=combined)
+
+        except Exception as e:
+            log.error(f"   ❌ Analysis failed for {ticker}: {e}")
+            return None
+    
     # ── Buy handler ──────────────────────────────────────────────
     def _handle_buy(self, ticker, signal):
-        """Process a BUY signal through risk checks and execution."""
+        """
+        Process a BUY signal through pre-trade checks, risk gate, and execution.
 
-        # Calculate quantity: 5% of portfolio per trade
-        position_size_pct = 0.05
-        portfolio_value   = self.risk.portfolio_value
-        trade_value       = portfolio_value * position_size_pct
-        quantity          = int(trade_value / signal['current_price'])
+        Pre-trade checks (before risk manager):
+        1. Duplicate guard  — skip if we already own this ticker
+        2. Price validity   — reject if price is 0 or missing
+        3. Quantity check   — reject if we can't afford even 1 share
 
+        Then the 6-check risk gate runs (position size, cash reserve,
+        max positions, sector exposure, daily loss, max drawdown).
+        """
+        current_price = signal.get('current_price', 0.0)
+        confidence    = signal.get('confidence', 0.0)
+
+        # ── Pre-check 1: Duplicate position guard ─────────────
+        existing = self.tracker._find_position(ticker)
+        if existing:
+            log.info(
+                f"   ⏭️  Already own {ticker} "
+                f"({float(existing.quantity):.0f} shares @ "
+                f"${float(existing.entry_price):.2f}) — skipping BUY"
+            )
+            return self._result(
+                ticker, 'HOLD', 'ALREADY_OWNED',
+                f'Already holding {ticker} — no pyramiding',
+                signal=signal
+            )
+
+        # ── Pre-check 2: Price validity ────────────────────────
+        if not current_price or current_price <= 0:
+            log.warning(f"   ❌ Invalid price for {ticker}: {current_price}")
+            return self._result(
+                ticker, 'HOLD', 'INVALID_PRICE',
+                f'Cannot buy {ticker} — invalid price: {current_price}',
+                signal=signal
+            )
+
+        # ── Calculate position size ────────────────────────────
+        # Use config-driven percentage (default 5% of portfolio per trade).
+        # Confidence scaling: high-confidence signals get up to 7%, low get 3%.
+        # This keeps position sizing simple but slightly adaptive.
+        portfolio_value    = self.risk.portfolio_value
+        base_size_pct      = self.config.POSITION_SIZE_PCT   # 0.05
+
+        # Scale ±2% around base based on confidence (0.55–1.0 range maps to 3%–7%)
+        confidence_range   = 1.0 - self.config.MIN_SIGNAL_CONFIDENCE   # 0.45
+        confidence_above   = confidence - self.config.MIN_SIGNAL_CONFIDENCE
+        confidence_scalar  = confidence_above / confidence_range if confidence_range > 0 else 0
+        adjusted_size_pct  = base_size_pct + (confidence_scalar * 0.02) - 0.01  # ±2% adj
+        adjusted_size_pct  = max(0.03, min(0.07, adjusted_size_pct))  # clamp 3%–7%
+
+        trade_value = portfolio_value * adjusted_size_pct
+        quantity    = int(trade_value / current_price)
+
+        # ── Pre-check 3: Quantity validity ─────────────────────
         if quantity < 1:
-            log.warning(f"   Quantity too small (<1 share) for {ticker} at ${signal['current_price']:.2f}")
-            return self._result(ticker, 'HOLD', 'TOO_SMALL',
-                                f'Cannot afford even 1 share at ${signal["current_price"]:.2f}')
+            log.warning(
+                f"   ❌ Cannot afford 1 share of {ticker} "
+                f"@ ${current_price:.2f} "
+                f"(trade budget: ${trade_value:,.0f})"
+            )
+            return self._result(
+                ticker, 'HOLD', 'TOO_SMALL',
+                f'Cannot afford even 1 share at ${current_price:.2f}',
+                signal=signal
+            )
 
         trade_proposal = {
             'ticker':        ticker,
             'action':        'BUY',
             'quantity':      quantity,
-            'current_price': signal['current_price'],
-            'confidence':    signal['confidence'],
-            'reasoning':     signal['reasoning']
+            'current_price': current_price,
+            'confidence':    confidence,
+            'reasoning':     signal.get('reasoning', '')
         }
 
-        log.info(f"\n   📋 Trade proposal: BUY {quantity} × {ticker} @ ${signal['current_price']:.2f} "
-                 f"= ${quantity * signal['current_price']:,.0f}")
+        log.info(
+            f"\n   📋 Trade proposal:"
+            f"\n      Action:     BUY"
+            f"\n      Ticker:     {ticker}"
+            f"\n      Quantity:   {quantity} shares"
+            f"\n      Price:      ${current_price:.2f}"
+            f"\n      Value:      ${quantity * current_price:,.2f}"
+            f"\n      Size:       {adjusted_size_pct:.1%} of portfolio"
+            f"\n      Confidence: {confidence:.0%}"
+        )
 
-        # Risk gate
+        # ── Risk gate (6 checks) ───────────────────────────────
         approval = self.risk.approve_trade(trade_proposal)
 
         if not approval['approved']:
-            log.warning(f"   ❌ Rejected: {approval['reason']}")
-            return self._result(ticker, 'HOLD', 'REJECTED', approval['reason'],
-                                signal=signal, approval=approval)
+            log.warning(f"   ❌ Risk rejected: {approval['reason']}")
+            return self._result(
+                ticker, 'HOLD', 'REJECTED', approval['reason'],
+                signal=signal, approval=approval
+            )
 
-        # Execute
+        # ── Execute ────────────────────────────────────────────
         try:
             self.tracker.add_position(
                 ticker=ticker,
                 quantity=quantity,
-                entry_price=signal['current_price']
+                entry_price=current_price
             )
-            log.info(f"   ✅ Executed: BUY {quantity} × {ticker} @ ${signal['current_price']:.2f}")
+            log.info(
+                f"   ✅ EXECUTED: BUY {quantity} × {ticker} "
+                f"@ ${current_price:.2f} = ${quantity * current_price:,.2f}"
+            )
 
             return {
-                'ticker':   ticker,
-                'action':   'BUY',
-                'quantity': quantity,
-                'price':    signal['current_price'],
-                'status':   'EXECUTED',
-                'signal':   signal,
-                'approval': approval
+                'ticker':    ticker,
+                'action':    'BUY',
+                'quantity':  quantity,
+                'price':     current_price,
+                'value':     round(quantity * current_price, 2),
+                'status':    'EXECUTED',
+                'signal':    signal,
+                'approval':  approval
             }
+
         except Exception as e:
             log.error(f"   ❌ Execution failed for {ticker}: {e}")
-            return self._result(ticker, 'HOLD', 'EXEC_FAILED', str(e),
-                                signal=signal, approval=approval)
+            return self._result(
+                ticker, 'HOLD', 'EXEC_FAILED', str(e),
+                signal=signal, approval=approval
+            )
 
     # ── Sell handler ─────────────────────────────────────────────
     def _handle_sell(self, ticker, signal):
-        """Process a SELL signal — only if we own this stock."""
+        """
+        Process a SELL signal — only executes if we own this ticker.
 
-        # Check if we own it
+        If we don't own the stock, returns HOLD (not an error — it just
+        means the strategy saw an overbought signal on a stock we never bought).
+        """
+        current_price = signal.get('current_price', 0.0)
+        confidence    = signal.get('confidence', 0.0)
+
+        # ── Check: do we own this stock? ──────────────────────
         position = self.tracker._find_position(ticker)
 
         if not position:
-            log.info(f"   SELL signal for {ticker} but no position held — HOLD")
-            return self._result(ticker, 'HOLD', 'NOT_OWNED',
-                                f'SELL signal but no {ticker} position open',
-                                signal=signal)
+            log.info(
+                f"   ⏭️  SELL signal for {ticker} but no position held — HOLD "
+                f"(not an error: we never bought it)"
+            )
+            return self._result(
+                ticker, 'HOLD', 'NOT_OWNED',
+                f'SELL signal for {ticker} but no open position — skipping',
+                signal=signal
+            )
+
+        entry_price  = float(position.entry_price)
+        unrealized   = (current_price - entry_price) / entry_price if entry_price > 0 else 0
 
         trade_proposal = {
             'ticker':        ticker,
             'action':        'SELL',
             'quantity':      float(position.quantity),
-            'current_price': signal['current_price'],
-            'confidence':    signal['confidence'],
-            'reasoning':     signal['reasoning']
+            'current_price': current_price,
+            'confidence':    confidence,
+            'reasoning':     signal.get('reasoning', '')
         }
 
-        log.info(f"\n   📋 Trade proposal: SELL {position.quantity} × {ticker} "
-                 f"@ ${signal['current_price']:.2f}")
+        log.info(
+            f"\n   📋 Trade proposal:"
+            f"\n      Action:     SELL"
+            f"\n      Ticker:     {ticker}"
+            f"\n      Quantity:   {float(position.quantity):.0f} shares"
+            f"\n      Entry:      ${entry_price:.2f}"
+            f"\n      Current:    ${current_price:.2f}"
+            f"\n      Unrealized: {unrealized:+.1%}"
+            f"\n      Confidence: {confidence:.0%}"
+        )
 
-        # Risk gate
+        # ── Risk gate ──────────────────────────────────────────
         approval = self.risk.approve_trade(trade_proposal)
 
         if not approval['approved']:
             log.warning(f"   ❌ Sell rejected: {approval['reason']}")
-            return self._result(ticker, 'HOLD', 'REJECTED', approval['reason'],
-                                signal=signal, approval=approval)
+            return self._result(
+                ticker, 'HOLD', 'REJECTED', approval['reason'],
+                signal=signal, approval=approval
+            )
 
-        # Execute
+        # ── Execute ────────────────────────────────────────────
         try:
             result = self.tracker.remove_position(
                 ticker=ticker,
                 quantity=float(position.quantity),
-                exit_price=signal['current_price']
+                exit_price=current_price
             )
             pnl = float(result['realized_pnl']) if result else 0
-            log.info(f"   ✅ Executed: SELL {ticker} — Realized P&L: ${pnl:+,.2f}")
+            log.info(
+                f"   ✅ EXECUTED: SELL {float(position.quantity):.0f} × {ticker} "
+                f"@ ${current_price:.2f}  |  Realized P&L: ${pnl:+,.2f}"
+            )
 
             return {
                 'ticker':       ticker,
                 'action':       'SELL',
                 'quantity':     float(position.quantity),
-                'price':        signal['current_price'],
-                'realized_pnl': pnl,
+                'price':        current_price,
+                'realized_pnl': round(pnl, 2),
                 'status':       'EXECUTED',
                 'signal':       signal,
                 'approval':     approval
             }
+
         except Exception as e:
             log.error(f"   ❌ Sell execution failed for {ticker}: {e}")
-            return self._result(ticker, 'HOLD', 'EXEC_FAILED', str(e),
-                                signal=signal, approval=approval)
-
-    # ================================================================
-    # STEP 3b — COMBINE SIGNALS
-    # ================================================================
-
-    def _combine_signals(self, rsi_signal, ta_signal=None):
-        """
-        Merge RSI signal and AI signal into one final decision.
-
-        Rules:
-        - Only RSI available → use RSI signal as-is
-        - Both agree (same action) → boost confidence, use combined reasoning
-        - Both disagree → HOLD (conflict, wait for clarity)
-        - One says HOLD → defer to the other but lower confidence
-
-        Returns:
-            dict: Same signal format as rsi_signal
-        """
-        # No AI signal — use RSI directly
-        if ta_signal is None or ta_signal.get('action') is None:
-            rsi_signal['source'] = 'RSI_ONLY'
-            return rsi_signal
-
-        rsi_action = rsi_signal.get('action', 'HOLD')
-        ta_action  = ta_signal.get('action', 'HOLD')
-        rsi_conf   = rsi_signal.get('confidence', 0.5)
-        ta_conf    = ta_signal.get('confidence', 0.5)
-
-        # ── Both agree ────────────────────────────────────────
-        if rsi_action == ta_action:
-            # Boost confidence when both models agree
-            combined_conf = min(0.95, (rsi_conf + ta_conf) / 2 + 0.10)
-            return {
-                **rsi_signal,
-                'confidence': combined_conf,
-                'source':     'RSI+AI_AGREE',
-                'reasoning':  (f"[RSI] {rsi_signal.get('reasoning', '')} "
-                               f"| [AI] {ta_signal.get('reasoning', '')}"),
-            }
-
-        # ── One says HOLD ─────────────────────────────────────
-        if rsi_action == 'HOLD':
-            return {**ta_signal, 'confidence': ta_conf * 0.8, 'source': 'AI_ONLY_LOW'}
-        if ta_action == 'HOLD':
-            return {**rsi_signal, 'confidence': rsi_conf * 0.8, 'source': 'RSI_ONLY_LOW'}
-
-        # ── Direct conflict (BUY vs SELL) ─────────────────────
-        log.info(f"   ⚠️  Signal conflict: RSI={rsi_action} vs AI={ta_action} → HOLD")
-        return {
-            **rsi_signal,
-            'action':     'HOLD',
-            'confidence': 0.30,
-            'source':     'CONFLICT_HOLD',
-            'reasoning':  f'Conflicting signals: RSI={rsi_action}, AI={ta_action}. Waiting for clarity.',
-        }
+            return self._result(
+                ticker, 'HOLD', 'EXEC_FAILED', str(e),
+                signal=signal, approval=approval
+            )
 
     # ================================================================
     # STEP 3c — SCAN WATCHLIST
@@ -575,14 +707,15 @@ class TradingSystem:
             'executed_sell': executed_sell,
             'rejected':      rejected,
             'hold':          hold,
-            'summary':       {k: float(v) for k, v in summary.items()
-                              if k not in ['cash', 'positions_value',
-                                           'portfolio_value',
-                                           'total_unrealized_pnl',
-                                           'total_realized_pnl',
-                                           'return_pct',
-                                           'cash_pct', 'total_positions']
-                              or True}
+            'summary':       {
+                'portfolio_value':       float(summary.get('portfolio_value', 0)),
+                'cash':                  float(summary.get('cash', 0)),
+                'cash_pct':              float(summary.get('cash_pct', 0)),
+                'total_positions':       int(summary.get('total_positions', 0)),
+                'total_unrealized_pnl':  float(summary.get('total_unrealized_pnl', 0)),
+                'total_realized_pnl':    float(summary.get('total_realized_pnl', 0)),
+                'return_pct':            float(summary.get('return_pct', 0)),
+            }
         }
 
     # ================================================================
@@ -745,8 +878,35 @@ def _serialize(obj):
     return obj
 
 
-# ── Global instance ───────────────────────────────────────────
-trading_system = TradingSystem()
+# ── Global singleton — lazy initialization ────────────────────
+# We do NOT call TradingSystem() at module import time.
+# Importing this module is now safe without a .env file.
+#
+# main.py and other callers access the singleton via get_trading_system():
+#
+#   from system.system_architect import get_trading_system
+#   trading_system = get_trading_system()
+#
+_trading_system_instance = None
+
+def get_trading_system():
+    """
+    Return the global TradingSystem singleton, creating it on first call.
+
+    This pattern prevents the system from crashing at import time when
+    API keys are missing or the environment is not yet configured.
+    """
+    global _trading_system_instance
+    if _trading_system_instance is None:
+        _trading_system_instance = TradingSystem()
+    return _trading_system_instance
+
+
+# ── Backwards-compatible alias ────────────────────────────────
+# Code that does `from system.system_architect import trading_system`
+# will get None until get_trading_system() is called first.
+# Prefer using get_trading_system() in all new code.
+trading_system = None  # populated by get_trading_system() on first use
 
 
 # ================================================================
@@ -756,26 +916,32 @@ trading_system = TradingSystem()
 if __name__ == "__main__":
     log.info("Running system_architect test...\n")
 
-    # ── Quick test (small watchlist, no AI to save time) ─────
-    trading_system.config.USE_TRADING_AGENT = False
-    trading_system.ta = None
+    # ── Initialize the system via the lazy factory ────────────
+    # trading_system (the module-level variable) is None by design.
+    # get_trading_system() creates the instance on first call.
+    ts = get_trading_system()
+    ts.config.USE_TRADING_AGENT = False
+    ts.ta = None
 
     log.info("TEST 1: Single stock analysis")
-    result = trading_system.analyze_single_stock('AAPL')
-    log.info(f"Result: action={result['action']}, status={result['status']}")
+    result = ts.analyze_single_stock('AAPL')
+    if result:
+        log.info(f"Result: action={result.get('action')}, status={result.get('status')}")
+    else:
+        log.warning("No result returned (no data or all HOLD)")
 
     log.info("\nTEST 2: Watchlist scan (3 stocks)")
-    scan = trading_system.scan_watchlist(['AAPL', 'MSFT', 'NVDA'])
+    scan = ts.scan_watchlist(['AAPL', 'MSFT', 'NVDA'])
     log.info(f"Bought: {scan['executed_buy']}")
     log.info(f"Held:   {scan['hold']}")
 
     log.info("\nTEST 3: Portfolio state")
-    trading_system.display_portfolio()
+    ts.display_portfolio()
 
     log.info("\nTEST 4: Stop-loss check")
-    sold = trading_system.check_stop_losses()
+    sold = ts.check_stop_losses()
     log.info(f"Force-sold: {sold}")
 
     log.info("\nTEST 5: Full daily run")
-    daily = trading_system.run_daily_analysis(['AAPL', 'MSFT', 'NVDA'])
+    daily = ts.run_daily_analysis(['AAPL', 'MSFT', 'NVDA'])
     log.info(f"Report saved: {daily['report_path']}")
