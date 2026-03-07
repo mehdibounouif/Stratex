@@ -36,20 +36,40 @@ class BaseConfig:
    
     @classmethod
     def validate(cls):
-        """Validate required environment variables and create necessary directories."""
-        missing = []
- 
+        """
+        Validate environment variables and create necessary directories.
+
+        CRITICAL keys (crash if missing):
+        - None — the system can run in degraded mode without any API key.
+
+        CONDITIONAL keys (warn if missing, features degrade gracefully):
+        - OPENAI_API_KEY      → required only if USE_TRADING_AGENT=True
+        - ALPHA_VANTAGE_API_KEY → required only for fundamentals & news
+
+        The system always runs with yfinance (no key needed) as the base.
+        """
+        import logging
+        logger = logging.getLogger('config.base_config')
+
+        warnings = []
+
         if not cls.OPENAI_API_KEY:
-            missing.append('OPENAI_API_KEY')
- 
-        if not cls.ALPHA_VANTAGE_API_KEY:
-            missing.append('ALPHA_VANTAGE_API_KEY')
- 
-        if missing:
-            raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
-        
-        # Create necessary directories
+            warnings.append(
+                'OPENAI_API_KEY not set — TradingAgents (AI signals) will be disabled. '
+                'Set USE_TRADING_AGENT=False in config/trading_config.py to suppress this.'
+            )
+
+        if not cls.ALPHA_VANTAGE_API_KEY or cls.ALPHA_VANTAGE_API_KEY == 'your_alpha_vantage_key_here':
+            warnings.append(
+                'ALPHA_VANTAGE_API_KEY not set — fundamentals and news data will be unavailable. '
+                'Price data via yfinance is unaffected.'
+            )
+
+        for w in warnings:
+            logger.warning(f"⚠️  CONFIG: {w}")
+
+        # Create necessary directories (always safe to do)
         for directory in [cls.DATA_DIR, cls.RAW_DATA_DIR, cls.PROCESSED_DATA_DIR, cls.LOG_DIR]:
             os.makedirs(directory, exist_ok=True)
-        
+
         return True

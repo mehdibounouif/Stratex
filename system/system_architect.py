@@ -798,29 +798,36 @@ trading_system = None  # populated by get_trading_system() on first use
 # STANDALONE TEST
 # ================================================================
 
+
 if __name__ == "__main__":
     log.info("Running system_architect test...\n")
 
-    # ── Quick test (small watchlist, no AI to save time) ─────
-    trading_system.config.USE_TRADING_AGENT = False
-    trading_system.ta = None
+    # ── Initialize the system via the lazy factory ────────────
+    # trading_system (the module-level variable) is None by design.
+    # get_trading_system() creates the instance on first call.
+    ts = get_trading_system()
+    ts.config.USE_TRADING_AGENT = False
+    ts.ta = None
 
     log.info("TEST 1: Single stock analysis")
-    result = trading_system.analyze_single_stock('AAPL')
-    log.info(f"Result: action={result['action']}, status={result['status']}")
+    result = ts.analyze_single_stock('AAPL')
+    if result:
+        log.info(f"Result: action={result.get('action')}, status={result.get('status')}")
+    else:
+        log.warning("No result returned (no data or all HOLD)")
 
     log.info("\nTEST 2: Watchlist scan (3 stocks)")
-    scan = trading_system.scan_watchlist(['AAPL', 'MSFT', 'NVDA'])
+    scan = ts.scan_watchlist(['AAPL', 'MSFT', 'NVDA'])
     log.info(f"Bought: {scan['executed_buy']}")
     log.info(f"Held:   {scan['hold']}")
 
     log.info("\nTEST 3: Portfolio state")
-    trading_system.display_portfolio()
+    ts.display_portfolio()
 
     log.info("\nTEST 4: Stop-loss check")
-    sold = trading_system.check_stop_losses()
+    sold = ts.check_stop_losses()
     log.info(f"Force-sold: {sold}")
 
     log.info("\nTEST 5: Full daily run")
-    daily = trading_system.run_daily_analysis(['AAPL', 'MSFT', 'NVDA'])
+    daily = ts.run_daily_analysis(['AAPL', 'MSFT', 'NVDA'])
     log.info(f"Report saved: {daily['report_path']}")
