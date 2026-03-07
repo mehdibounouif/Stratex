@@ -1,0 +1,415 @@
+Momentum strategy answers one question:
+
+"Is this stock moving in a clear direction fast enough to keep going?"
+
+it tells you:
+
+    ---> stocks that are already moving up  = strong momentum = BUY
+    ---> stocks that are already moving down = negative momentum = SELL
+    ---> if no remaquqble moving = weak momentum   = HOLD
+
+--------------------------------------------------------------------------
+base idea: the price trends (goin up / down) tend to continue for a while|
+--------------------------------------------------------------------------
+The faster and longer it rolls in one direction, the more likely it keeps going that way.
+
+
+                    -----------------
+                    |   LENSES      |
+                    -----------------
+
+═════════════════
+Rate Of Change  |
+═════════════════
+
+
+ROC answers ONE question:
+    "How much has the price changed over the last N days?"
+
+it tells you : how fast the prices are moving in % 
+
+FORMULA:
+══════════════════════════════════════════════════════════════
+
+ROC = ((Price_today - Price_N_days_ago) / Price_N_days_ago) * 100
+
+    price_today : closing price of today
+    price_N_days_ago = closing price n days ago
+══════════════════════════════════════════════════════════════
+
+WORKFLOW(based on my settings):
+Settings in your strategy:
+  roc_period    = 20 days
+  roc_threshold = ±5%
+
+──────────────────────────────────────────────────────────────
+Step 0 — Closing prices (20-day window)
+
+| Day | Close |              |
+| --: | ----: | :----------- |
+|   1 |   100 | ← start here |
+|   2 |   101 |              |
+|   3 |   102 |              |
+|   4 |   101 |              |
+|   5 |   103 |              |
+|   6 |   104 |              |
+|   7 |   103 |              |
+|   8 |   105 |              |
+|   9 |   106 |              |
+|  10 |   105 |              |
+|  11 |   107 |              |
+|  12 |   108 |              |
+|  13 |   107 |              |
+|  14 |   109 |              |
+|  15 |   110 |              |
+|  16 |   109 |              |
+|  17 |   111 |              |
+|  18 |   112 |              |
+|  19 |   111 |              |
+|  20 |   113 |              |
+|  21 |   108 | ← today      |
+
+──────────────────────────────────────────────────────────────
+Step 1 — Plug into formula
+
+  Price today       = 108   (Day 21)
+  Price 20 days ago = 100   (Day 1)
+
+  ROC = ((108 - 100) / 100) * 100
+      = (8 / 100) * 100
+      = +8.0%
+
+──────────────────────────────────────────────────────────────
+Step 2 — Compare to threshold
+
+  Your threshold = ±5%
+  ROC = +8.0%
+
+  | Condition      | Met?        |
+  | :------------- | :---------- |
+  | ROC > +5%      | ✅ YES      |
+  | ROC < -5%      | ❌ NO       |
+
+──────────────────────────────────────────────────────────────
+Step 3 — Cast the vote
+
+  | ROC Range    | Meaning                   | Vote |
+  | :----------- | :------------------------ | :--- |
+  | Above +5%    | Strong upward momentum    | BUY  |
+  | -5% to +5%   | Weak or no momentum       | HOLD |
+  | Below -5%    | Strong downward momentum  | SELL |
+
+  ROC = +8.0% → above +5% threshold → BUY VOTE ✅
+
+──────────────────────────────────────────────────────────────
+Final ROC summary:
+
+  | Metric             | Value  |
+  | :----------------- | :----- |
+  | Price 20 days ago  | $100   |
+  | Price today        | $108   |
+  | ROC                | +8.0%  |
+  | Threshold          | ±5%    |
+  | Vote               | BUY ✅ |
+
+
+════════════════════════════
+Moving average crossover    |
+════════════════════════════
+
+══════════════════════════════════════════════════════════════
+What is a moving average?
+    A Moving Average smooths out daily price noise
+    by averaging the last N closes.
+
+  Daily prices are NOISY:        MA is SMOOTH:
+  105, 98, 112, 95, 108...  -->   103, 104, 104, 105...
+
+Now you use TWO moving averages:
+
+  Fast MA (10 days)  → reacts quickly  → follows recent price
+  Slow MA (30 days)  → reacts slowly   → shows the bigger trend
+
+  When Fast MA is ABOVE Slow MA → short-term trend is UP
+  When Fast MA is BELOW Slow MA → short-term trend is DOWN
+
+──────────────────────────────────────────────────────────────
+The CROSSOVER is the moment they switch positions.
+
+  Fast crosses ABOVE slow → trend just turned UP   → BUY
+  Fast crosses BELOW slow → trend just turned DOWN → SELL
+
+like a sprinter and a merathon runner
+══════════════════════════════════════════════════════════════
+
+FORMULA :════════════════════════════════════════════════════
+
+  Fast MA = average(last 10 closing prices)
+  Slow MA = average(last 30 closing prices)
+
+  Golden Cross (BUY):
+    Yesterday: Fast MA < Slow MA
+    Today:     Fast MA > Slow MA   ← they just crossed UP
+
+  Death Cross (SELL):
+    Yesterday: Fast MA > Slow MA
+    Today:     Fast MA < Slow MA   ← they just crossed DOWN
+
+══════════════════════════════════════════════════════════════
+
+Settings in your strategy:
+  fast_ma = 10 days
+  slow_ma = 30 days
+
+──────────────────────────────────────────────────────────────
+Step 0 — Sample closing prices (30 days shown)
+
+| Day | Close | Fast MA (10) | Slow MA (30) |
+| --: | ----: | -----------: | -----------: |
+|   1 |    95 |            — |            — |
+|   2 |    94 |            — |            — |
+|   3 |    93 |            — |            — |
+|   4 |    92 |            — |            — |
+|   5 |    91 |            — |            — |
+|   6 |    90 |            — |            — |
+|   7 |    89 |            — |            — |
+|   8 |    88 |            — |            — |
+|   9 |    87 |            — |            — |
+|  10 |    86 |        90.50 |            — |
+|  11 |    87 |        89.70 |            — |
+|  12 |    88 |        89.10 |            — |
+|  13 |    89 |        88.70 |            — |
+|  14 |    90 |        88.50 |            — |
+|  15 |    91 |        88.50 |            — |
+|  16 |    92 |        88.70 |            — |
+|  17 |    93 |        89.10 |            — |
+|  18 |    94 |        89.70 |            — |
+|  19 |    95 |        90.50 |            — |
+|  20 |    96 |        91.50 |            — |
+|  21 |    97 |        92.50 |            — |
+|  22 |    98 |        93.50 |            — |
+|  23 |    99 |        94.50 |            — |
+|  24 |   100 |        95.50 |            — |
+|  25 |   101 |        96.50 |            — |
+|  26 |   102 |        97.50 |            — |
+|  27 |   103 |        98.50 |            — |
+|  28 |   104 |        99.50 |            — |
+|  29 |   105 |       100.50 |        95.33 | ← yesterday
+|  30 |   106 |       101.50 |        96.00 | ← today
+
+──────────────────────────────────────────────────────────────
+Step 1 — Calculate Fast MA on Day 30
+
+  Average of Days 21 → 30 closes:
+  (97+98+99+100+101+102+103+104+105+106) / 10
+  = 1015 / 10
+  = 101.50
+
+──────────────────────────────────────────────────────────────
+Step 2 — Calculate Slow MA on Day 30
+
+  Average of Days 1 → 30 closes:
+  (95+94+93+...+105+106) / 30
+  = 2880 / 30
+  = 96.00
+
+──────────────────────────────────────────────────────────────
+Step 3 — Check for crossover
+
+  | Day       | Fast MA | Slow MA | Fast vs Slow   |
+  | :-------- | ------: | ------: | :------------- |
+  | Yesterday |  100.50 |   95.33 | Fast ABOVE     |
+  | Today     |  101.50 |   96.00 | Fast ABOVE     |
+
+  Golden Cross needs:  Yesterday BELOW → Today ABOVE  ← NO
+  Death Cross needs:   Yesterday ABOVE → Today BELOW  ← NO
+
+  Fast MA has been above Slow MA for several days already.
+  No fresh crossover today.
+
+──────────────────────────────────────────────────────────────
+What a Golden Cross looks like vs what we have:
+
+  GOLDEN CROSS (would be BUY):       TODAY (no cross):
+  Day 29: Fast=94  Slow=95 ← below   Day 29: Fast=100.50 Slow=95.33
+  Day 30: Fast=97  Slow=95 ← above   Day 30: Fast=101.50 Slow=96.00
+            ↑ crossed!                         ↑ already above, no event
+
+──────────────────────────────────────────────────────────────
+Step 4 — Cast the vote
+
+  | Condition              | Met?   | Vote |
+  | :--------------------- | :----- | :--- |
+  | Golden Cross today     | ❌ NO  | —    |
+  | Death Cross today      | ❌ NO  | —    |
+  | No crossover           | ✅ YES | HOLD |
+
+  Result → HOLD vote
+
+──────────────────────────────────────────────────────────────
+Crossover visual guide:
+
+                        ╱‾ Golden Cross → BUY ✅
+  Fast MA  _ _ _ _ _ _ ╱‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
+  Slow MA  ‾‾‾‾‾‾‾‾‾‾‾‾╲_ _ Death Cross → SELL ❌
+
+──────────────────────────────────────────────────────────────
+Final MA Crossover summary:
+
+  | Metric        | Value          |
+  | :------------ | :------------- |
+  | Fast MA       | 101.50         |
+  | Slow MA       | 96.00          |
+  | Golden Cross  | NO             |
+  | Death Cross   | NO             |
+  | Vote          | HOLD           |
+══════════════════════════════════════════════════════════════
+
+════════════════════════GOLDEN RULE═══════════════════════════
+
+  Fast MA crosses ABOVE Slow MA → trend just turned UP   → BUY
+  Fast MA crosses BELOW Slow MA → trend just turned DOWN → SELL
+  No crossing today             → nothing new happened   → HOLD
+
+  The signal is the CROSSING EVENT itself, not which one is higher.
+
+══════════════════════════════════════════════════════════════
+
+
+═══════════════
+Price VS MA    |
+═══════════════
+
+Price vs MA answers ONE question:
+
+  "Is the stock trading above or below its own average price?"
+
+it tells you: where the price is RIGHT NOW
+              compared to its historical average
+
+  Price ABOVE average → stock doing BETTER than usual → BUY
+  Price BELOW average → stock doing WORSE than usual  → SELL
+
+══════════════════════════════════════════════════════════════
+
+The Analogy
+══════════════════════════════════════════════════════════════
+the stock  50 -day MA is its usual earnings
+
+  Price > MA → stock is having a GOOD period → uptrend
+  Price < MA → stock is having a BAD period  → downtrend
+  
+══════════════════════════════════════════════════════════════
+
+The Formula
+══════════════════════════════════════════════════════════════
+
+  MA_50 = average of last 50 closing prices
+
+  price_vs_ma_pct = ((Price_today - MA_50) / MA_50) * 100
+                          ↑
+                how far above or below in %
+
+  Positive (+) → price above MA → uptrend  → BUY
+  Negative (-) → price below MA → downtrend → SELL
+
+══════════════════════════════════════════════════════════════
+
+Step-by-Step Worked Example
+Setting in your strategy:
+  price_ma = 50 days
+
+──────────────────────────────────────────────────────────────
+Step 0 — You need 50 days of closes to compute MA_50
+
+| Day | Close |
+| --: | ----: |
+|   1 |    98 |
+|   2 |    99 |
+|   3 |   100 |
+|   4 |   101 |
+|   5 |   102 |
+|  .. |    .. |  ← 50 days total
+|  49 |   104 |
+|  50 |   105 |
+|  51 |   108 | ← today
+
+──────────────────────────────────────────────────────────────
+Step 1 — Calculate MA_50
+
+  Average of Days 1 → 50 closes = 103.00
+  (sum of all 50 closes divided by 50)
+
+──────────────────────────────────────────────────────────────
+Step 2 — Plug into formula
+
+  Price today = 108
+  MA_50       = 103
+
+  price_vs_ma_pct = ((108 - 103) / 103) * 100
+                  = (5 / 103) * 100
+                  = +4.85%
+
+──────────────────────────────────────────────────────────────
+Step 3 — Visualize it
+
+  Price ──────────────────────── $108  ← today
+                  ↑ +4.85%
+  MA_50 ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─  $103  ← 50-day average
+                                         (sea level)
+
+  Price is floating ABOVE sea level → uptrend ✅
+
+──────────────────────────────────────────────────────────────
+Step 4 — Cast the vote
+
+  | price_vs_ma_pct | Meaning                     | Vote |
+  | :-------------- | :-------------------------- | :--- |
+  | Positive (+)    | Price above MA → uptrend    | BUY  |
+  | Zero            | Price exactly at MA → flat  | HOLD |
+  | Negative (-)    | Price below MA → downtrend  | SELL |
+
+  +4.85% → price is above MA → BUY VOTE ✅
+
+──────────────────────────────────────────────────────────────
+Final Price vs MA summary:
+
+  | Metric          | Value    |
+  | :-------------- | :------- |
+  | Price today     | $108.00  |
+  | MA_50           | $103.00  |
+  | price_vs_ma_pct | +4.85%   |
+  | Vote            | BUY ✅   |
+
+══════════════════════════════════════════════════════════════
+
+
+══════════════════════════Golden Rule═════════════════════════
+
+  Price ABOVE MA_50 → stock doing better than its average → BUY
+  Price BELOW MA_50 → stock doing worse than its average  → SELL
+  Price EQUALS MA_50 → stock right at its average         → HOLD
+
+  The signal is WHERE price sits relative to the average.
+
+══════════════════════════════════════════════════════════════
+
+─────────────────────────────────────────────────────────────
+SUMMARY OF ALL CASES
+─────────────────────────────────────────────────────────────
+
+  | Case | ROC  | MA Cross | Price/MA | Action | Confidence |
+  | :--: | :--- | :------- | :------- | :----- | :--------- |
+  |  1   | BUY  | BUY      | BUY      | BUY    | ~90%       |
+  |  2   | SELL | SELL     | SELL     | SELL   | ~90%       |
+  |  3   | HOLD | HOLD     | HOLD     | HOLD   | ~90%       |
+  |  4   | BUY  | BUY      | HOLD     | BUY    | ~70%       |
+  |  5   | BUY  | HOLD     | BUY      | BUY    | ~70%       |
+  |  6   | HOLD | BUY      | BUY      | BUY    | ~70%       |
+  |  7   | SELL | SELL     | HOLD     | SELL   | ~70%       |
+  |  8   | SELL | HOLD     | SELL     | SELL   | ~70%       |
+  |  9   | HOLD | SELL     | SELL     | SELL   | ~70%       |
+  | 10   | BUY  | SELL     | HOLD     | HOLD   | ~55%       |
+  | 11   | SELL | BUY      | HOLD     | HOLD   | ~55%       |
+
+══════════════════════════════════════════════════════════════

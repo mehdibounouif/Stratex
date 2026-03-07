@@ -11,6 +11,7 @@ Author: Kawtar
 
 
 import pandas as pd
+from decimal import Decimal
 import numpy as np
 from logger import get_logger, setup_logging
 
@@ -237,6 +238,143 @@ class MomentumStrategy:
             Dictionary containing computed
             indicator values.
         """
+        try:
+            df.columns = [c.lower() for c in df.columns]
+        except Exception as e:
+            log.error(f"❌ Failed to normalize column names: {e}")
+            return {}
+
+        if "close" not in df.columns:
+            log.error(f"❌ 'close' column not found. Available: {list(df.columns)}")
+            return {}
+
+        min_required = max(self.roc_period, self.slow_ma, self.price_ma) + 2
+
+        if len(df) < min_required:
+            log.warning(f"⚠️ Insufficient data: {len(df)} rows, need {min_required}.")
+            return {}
+
+        try:
+            closes = pd.Series(
+                [Decimal(str(x)) for x in df["close"].values],
+                index=df.index
+            )
+        except Exception as e:
+            log.error(f"❌ Failed to extract closing prices: {e}")
+            return {}
+
+        if closes.isnull().any():
+            closes = closes.dropna()
+            if len(closes) < min_required:
+                log.error(f"❌ After dropping NaNs: {len(closes)} rows, need {min_required}.")
+                return {}
+
+        log.info(f"✅ DataFrame validated: {len(closes)} rows | First={closes.iloc[0]} | Last={closes.iloc[-1]}")
+
+        try:
+            price_today = closes.iloc[-1]
+            price_n_ago = closes.iloc[-1 - self.roc_period]
+
+            if price_n_ago == 0:
+                log.error("❌ price_n_ago is zero — division by zero.")
+                return {}
+
+            roc = ((price_today - price_n_ago) / price_n_ago) * Decimal("100")
+            log.debug(f"ROC={roc:.4f}% | today={price_today} | {self.roc_period}d_ago={price_n_ago}")
+
+        except Exception as e:
+            log.error(f"❌ ROC calculation failed: {e}")
+            return {}
+
+        try:
+            fast_ma_series  = closes.rolling(window=self.fast_ma).mean()
+            slow_ma_series  = closes.rolling(window=self.slow_ma).mean()
+            price_ma_series = closes.rolling(window=self.price_ma).mean()
+
+            fast_ma_today     = Decimal(str(fast_ma_series.iloc[-1]))
+            fast_ma_yesterday = Decimal(str(fast_ma_series.iloc[-2]))
+            slow_ma_today     = Decimal(str(slow_ma_series.iloc[-1]))
+            slow_ma_yesterday = Decimal(str(slow_ma_series.iloc[-2]))
+            price_ma_today    = Decimal(str(price_ma_series.iloc[-1]))
+
+            for name, val in {
+                "fast_ma_today"     : fast_ma_today,
+                "fast_ma_yesterday" : fast_ma_yesterday,
+                "slow_ma_today"     : slow_ma_today,
+                "slow_ma_yesterday" : slow_ma_yesterday,
+                "price_ma_today"    : price_ma_today,
+            }.items():
+                if str(val) == "NaN":
+                    log.error(f"❌ {name} is NaN — increase days in get_price_history().")
+                    return {}
+
+            log.debug(
+                f"FastMA={fast_ma_today:.4f} (prev={fast_ma_yesterday:.4f}) | "
+                f"SlowMA={slow_ma_today:.4f} (prev={slow_ma_yesterday:.4f}) | "
+                f"PriceMA={price_ma_today:.4f}"
+            )
+
+        except Exception as e:
+            log.error(f"❌ Moving average calculation failed: {e}")
+            return {}
+
+        try:
+            golden_cross = bool(
+                fast_ma_yesterday < slow_ma_yesterday and
+                fast_ma_today     > slow_ma_today
+            )
+            death_cross = bool(
+                fast_ma_yesterday > slow_ma_yesterday and
+                fast_ma_today     < slow_ma_today
+            )
+            log.debug(f"GoldenCross={golden_cross} | DeathCross={death_cross}")
+
+        except Exception as e:
+            log.error(f"❌ Crossover detection failed: {e}")
+            return {}
+
+        try:
+            if price_ma_today == 0:
+                log.error("❌ price_ma_today is zero — division by zero.")
+                return {}
+
+            price_vs_ma_pct = (
+                (price_today - price_ma_today) / price_ma_today
+            ) * Decimal("100")
+
+            log.debug(f"PriceVsMA={price_vs_ma_pct:.4f}% | price={price_today} | MA={price_ma_today:.4f}")
+
+        except Exception as e:
+            log.error(f"❌ Price vs MA calculation failed: {e}")
+            return {}
+
+        try:
+            indicators = {
+                "roc"             : round(roc,             4),
+                "fast_ma"         : round(fast_ma_today,   4),
+                "slow_ma"         : round(slow_ma_today,   4),
+                "price_ma"        : round(price_ma_today,  4),
+                "price_vs_ma_pct" : round(price_vs_ma_pct, 4),
+                "golden_cross"    : golden_cross,
+                "death_cross"     : death_cross,
+                "price_today"     : round(price_today,     4),
+            }
+
+            log.info(
+                f"✅ Indicators ready | "
+                f"ROC={roc:.2f}% | "
+                f"FastMA={fast_ma_today:.2f} | "
+                f"SlowMA={slow_ma_today:.2f} | "
+                f"PriceVsMA={price_vs_ma_pct:.2f}% | "
+                f"GoldenCross={golden_cross} | "
+                f"DeathCross={death_cross}"
+            )
+
+            return indicators
+
+        except Exception as e:
+            log.error(f"❌ Failed to pack indicators dict: {e}")
+            return {}
 
     def _generate_signal(self, ticker, indicators):
         """
@@ -312,6 +450,115 @@ momentum_strategy = MomentumStrategy()
 # DEMO & TESTING
 # ══════════════════════════════════════════════════════════════
 
+
+if __name__ == "__main__":
+    print("\n" + "="*60)
+    print("MOMENTUM STRATEGY — _calculate_indicators() TEST")
+    print("="*60)
+
+    TICKERS = ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN"]
+    DAYS    = 90
+
+    # ── create strategy instance ───────────────────────────
+    strategy = MomentumStrategy(
+        roc_period    = 20,
+        roc_threshold = 5.0,
+        fast_ma       = 10,
+        slow_ma       = 30,
+        price_ma      = 50
+    )
+
+    # ── run test for each ticker ───────────────────────────
+    results  = {}
+    failed   = []
+
+    for ticker in TICKERS:
+        print(f"\n{'='*60}")
+        print(f"TESTING: {ticker}")
+        print(f"{'='*60}")
+
+        df = strategy.data_access.get_price_history(ticker, days=DAYS)
+
+        if df is None or df.empty:
+            print(f"❌ No data returned for {ticker}.")
+            failed.append(ticker)
+            continue
+
+        print(f"✅ Got {len(df)} rows | From {df['Date'].iloc[0]} → {df['Date'].iloc[-1]}")
+
+        indicators = strategy._calculate_indicators(df)
+
+        if not indicators:
+            print(f"❌ _calculate_indicators() returned empty dict for {ticker}.")
+            failed.append(ticker)
+            continue
+
+        results[ticker] = indicators
+
+        print(f"  {'roc':<20} : {indicators['roc']}")
+        print(f"  {'fast_ma':<20} : {indicators['fast_ma']}")
+        print(f"  {'slow_ma':<20} : {indicators['slow_ma']}")
+        print(f"  {'price_ma':<20} : {indicators['price_ma']}")
+        print(f"  {'price_vs_ma_pct':<20} : {indicators['price_vs_ma_pct']}")
+        print(f"  {'golden_cross':<20} : {indicators['golden_cross']}")
+        print(f"  {'death_cross':<20} : {indicators['death_cross']}")
+        print(f"  {'price_today':<20} : {indicators['price_today']}")
+
+    # ── summary ────────────────────────────────────────────
+    print(f"\n{'='*60}")
+    print("SUMMARY")
+    print(f"{'='*60}")
+    print(f"  Total   : {len(TICKERS)}")
+    print(f"  Passed  : {len(results)}  → {list(results.keys())}")
+    print(f"  Failed  : {len(failed)}   → {failed if failed else 'none'}")
+    print(f"{'='*60}")
+
+    if failed:
+        print(f"\n⚠️  Some tickers failed. Check logs above.")
+        raise SystemExit(1)
+
+    print("\n✅ All tickers passed — ready to build _generate_signal()")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""
 if __name__ == "__main__":
     print("\n" + "="*60)
     print("MOMENTUM STRATEGY DEMO")
@@ -360,3 +607,4 @@ if __name__ == "__main__":
     print("  signal = momentum.analyze('AAPL')")
     print("\nThe strategy automatically uses your data_access singleton!")
     print("No direct yfinance calls - fully integrated with your architecture.")
+"""
