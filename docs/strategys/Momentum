@@ -393,3 +393,23 @@ Final Price vs MA summary:
   The signal is WHERE price sits relative to the average.
 
 ══════════════════════════════════════════════════════════════
+
+─────────────────────────────────────────────────────────────
+SUMMARY OF ALL CASES
+─────────────────────────────────────────────────────────────
+
+  | Case | ROC  | MA Cross | Price/MA | Action | Confidence |
+  | :--: | :--- | :------- | :------- | :----- | :--------- |
+  |  1   | BUY  | BUY      | BUY      | BUY    | ~90%       |
+  |  2   | SELL | SELL     | SELL     | SELL   | ~90%       |
+  |  3   | HOLD | HOLD     | HOLD     | HOLD   | ~90%       |
+  |  4   | BUY  | BUY      | HOLD     | BUY    | ~70%       |
+  |  5   | BUY  | HOLD     | BUY      | BUY    | ~70%       |
+  |  6   | HOLD | BUY      | BUY      | BUY    | ~70%       |
+  |  7   | SELL | SELL     | HOLD     | SELL   | ~70%       |
+  |  8   | SELL | HOLD     | SELL     | SELL   | ~70%       |
+  |  9   | HOLD | SELL     | SELL     | SELL   | ~70%       |
+  | 10   | BUY  | SELL     | HOLD     | HOLD   | ~55%       |
+  | 11   | SELL | BUY      | HOLD     | HOLD   | ~55%       |
+
+══════════════════════════════════════════════════════════════
