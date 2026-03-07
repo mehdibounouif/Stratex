@@ -32,7 +32,7 @@ from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
 from config import BaseConfig, TradingConfig, RiskConfig
-from data.data_enginner import data_access
+from data.data_engineer import data_access
 from strategies.strategy_researcher import strategy_engine
 from risk.risk_manager import risk_manager
 from strategies.momentum_strategy import MomentumStrategy

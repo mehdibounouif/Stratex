@@ -74,7 +74,7 @@ class StrategyResearcher:
 strategy_engine = StrategyResearcher()
 
 if __name__ == "__main__":
-    from data.data_enginner import data_access
+    from data.data_engineer import data_access
     logging.info("Testing Stratgy...")
     data = data_access.get_price_history('AMD', days=90)
     signal = strategy_engine.analyze('AMD', data, 'rsi_mean_reversion')
