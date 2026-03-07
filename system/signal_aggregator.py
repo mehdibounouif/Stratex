@@ -18,6 +18,10 @@ class SignalAggregator:
     """
     Combines multiple trading signals with intelligent conflict resolution.
     
+    CONFIDENCE SCALE: All inputs and outputs use 0.0–1.0 floats.
+    Strategies (RSI, Momentum) return 0.0–1.0.
+    If a signal accidentally uses 0–100, _normalize() corrects it.
+
     SUPPORTED STRATEGIES:
     - RSI (Relative Strength Index)
     - Momentum (Price momentum)
@@ -25,110 +29,123 @@ class SignalAggregator:
     - Custom strategies (any that return standard signal format)
     
     CONFLICT RESOLUTION LOGIC:
-    1. All agree (BUY/BUY/BUY) → High confidence (+15%)
-    2. Majority agree (2/3 BUY) → Medium confidence (+5%)
+    1. All agree (BUY/BUY/BUY) → High confidence (+0.10 bonus)
+    2. Majority agree (2/3 BUY) → Medium confidence (+0.05 bonus)
     3. Split decision (1 BUY, 1 SELL, 1 HOLD) → HOLD
     4. Conflict (BUY vs SELL with no HOLD) → HOLD (wait for clarity)
-    5. One strong signal, others neutral → Use strong signal at 80% confidence
-    
-    CONFIDENCE SCORING:
-    - 90-100%: Very strong (all sources agree)
-    - 75-89%: Strong (majority agree or one very confident)
-    - 60-74%: Moderate (weak agreement or single source)
-    - 40-59%: Weak (conflicting signals)
-    - 0-39%: Very weak (high conflict, default to HOLD)
+    5. One strong signal, others neutral → Use strong signal at 80%
     """
     
     def __init__(self):
-        """Initialize signal aggregator."""
-        self.history = []  # Track aggregation history for analysis
+        self.history = []
         log.info("✅ SignalAggregator initialized")
-    
+
+    # ── Internal helpers ──────────────────────────────────────────
+
+    @staticmethod
+    def _normalize(confidence):
+        """
+        Normalize confidence to 0.0–1.0 regardless of input scale.
+
+        Strategies should return 0.0–1.0, but this guards against any
+        signal that accidentally uses 0–100 integers.
+        """
+        try:
+            c = float(confidence)
+            if c > 1.0:
+                c = c / 100.0   # 75 → 0.75
+            return round(max(0.0, min(1.0, c)), 4)
+        except (TypeError, ValueError):
+            return 0.0
+
     def combine_two(self, signal1, signal2):
         """
         Combine two signals (e.g., RSI + Momentum).
         
         Parameters
         ----------
-        signal1 : dict
-            {'action': 'BUY'|'SELL'|'HOLD', 'confidence': 0-100, 'reasoning': str, 'source': str}
-        
-        signal2 : dict
-            Same format as signal1
+        signal1, signal2 : dict
+            {'action': 'BUY'|'SELL'|'HOLD', 'confidence': 0.0-1.0,
+             'reasoning': str, 'source': str}
         
         Returns
         -------
-        dict : Combined signal with adjusted confidence
+        dict : Combined signal. confidence is always 0.0–1.0.
         """
         action1 = signal1['action']
         action2 = signal2['action']
-        conf1 = signal1['confidence']
-        conf2 = signal2['confidence']
+        conf1   = self._normalize(signal1['confidence'])
+        conf2   = self._normalize(signal2['confidence'])
         
-        source1 = signal1.get('source', 'Source1')
-        source2 = signal2.get('source', 'Source2')
+        source1 = signal1.get('source', signal1.get('strategy', 'Source1'))
+        source2 = signal2.get('source', signal2.get('strategy', 'Source2'))
         
-        log.info(f"📊 Combining: {source1}={action1}@{conf1}%, {source2}={action2}@{conf2}%")
+        log.info(f"📊 Combining: {source1}={action1}@{conf1:.0%}, {source2}={action2}@{conf2:.0%}")
         
         # ── CASE 1: Both Agree ────────────────────────────────
         if action1 == action2 and action1 != 'HOLD':
             avg_confidence = (conf1 + conf2) / 2
-            boosted = min(95, avg_confidence + 10)  # +10% bonus, max 95%
+            boosted = min(0.95, avg_confidence + 0.10)  # +10% bonus, cap at 95%
             
             result = {
-                'action': action1,
-                'confidence': round(boosted, 2),
-                'reasoning': f"✅ {source1} + {source2} both signal {action1}",
-                'sources': [source1, source2],
-                'agreement': 'full'
+                'action':     action1,
+                'confidence': round(boosted, 4),
+                'reasoning':  f"✅ {source1} + {source2} both signal {action1}",
+                'sources':    [source1, source2],
+                'agreement':  'full'
             }
-            
-            log.info(f"   ✅ Agreement: {action1} @ {result['confidence']}%")
+            log.info(f"   ✅ Agreement: {action1} @ {result['confidence']:.0%}")
             return result
         
         # ── CASE 2: Conflict (BUY vs SELL) ────────────────────
         if (action1 == 'BUY' and action2 == 'SELL') or \
            (action1 == 'SELL' and action2 == 'BUY'):
-            
             result = {
-                'action': 'HOLD',
-                'confidence': 40,
-                'reasoning': f"⚠️ CONFLICT: {source1} says {action1}, {source2} says {action2} - waiting",
-                'sources': [source1, source2],
-                'agreement': 'conflict'
+                'action':    'HOLD',
+                'confidence': 0.30,
+                'reasoning':  f"⚠️ CONFLICT: {source1} says {action1}, {source2} says {action2} — waiting",
+                'sources':    [source1, source2],
+                'agreement':  'conflict'
             }
-            
             log.warning(f"   ⚠️ Conflict: {source1}={action1} vs {source2}={action2} → HOLD")
             return result
         
         # ── CASE 3: One HOLD ───────────────────────────────────
         if action1 == 'HOLD' and action2 != 'HOLD':
-            reduced = conf2 * 0.8
-            
+            reduced = round(conf2 * 0.80, 4)
             result = {
-                'action': action2,
-                'confidence': round(reduced, 2),
-                'reasoning': f"📉 {source2} signal {action2} ({source1} neutral)",
-                'sources': [source2],
-                'agreement': 'partial'
+                'action':     action2,
+                'confidence': reduced,
+                'reasoning':  f"📉 {source2} signals {action2} ({source1} neutral)",
+                'sources':    [source2],
+                'agreement':  'partial'
             }
-            
-            log.info(f"   📉 {source1} neutral, using {source2}: {action2} @ {result['confidence']}%")
+            log.info(f"   📉 {source1} neutral, using {source2}: {action2} @ {reduced:.0%}")
             return result
         
         if action2 == 'HOLD' and action1 != 'HOLD':
-            reduced = conf1 * 0.8
-            
+            reduced = round(conf1 * 0.80, 4)
             result = {
-                'action': action1,
-                'confidence': round(reduced, 2),
-                'reasoning': f"📉 {source1} signal {action1} ({source2} neutral)",
-                'sources': [source1],
-                'agreement': 'partial'
+                'action':     action1,
+                'confidence': reduced,
+                'reasoning':  f"📉 {source1} signals {action1} ({source2} neutral)",
+                'sources':    [source1],
+                'agreement':  'partial'
             }
-            
-            log.info(f"   📉 {source2} neutral, using {source1}: {action1} @ {result['confidence']}%")
+            log.info(f"   📉 {source2} neutral, using {source1}: {action1} @ {reduced:.0%}")
             return result
+
+        # ── CASE 4: Both HOLD ──────────────────────────────────
+        avg_conf = round((conf1 + conf2) / 2, 4)
+        result = {
+            'action':     'HOLD',
+            'confidence': avg_conf,
+            'reasoning':  f"⏸️ Both {source1} and {source2} say HOLD",
+            'sources':    [source1, source2],
+            'agreement':  'hold'
+        }
+        log.info(f"   📊 Both sources HOLD")
+        return result
         
         # ── CASE 4: Both HOLD ──────────────────────────────────
         result = {
@@ -172,133 +189,92 @@ class SignalAggregator:
     def combine_multiple(self, signals):
         """
         Combine 3+ signals using majority voting with confidence weighting.
-        
-        VOTING LOGIC:
-        - Count votes for each action (BUY/SELL/HOLD)
-        - Winner = most votes
-        - Confidence = (winner_votes / total_votes) × avg_confidence
-        - Bonus: +5% if majority (>50%), +10% if unanimous
-        
-        Parameters
-        ----------
-        signals : list of dict
-            List of signal dictionaries
-        
-        Returns
-        -------
-        dict : Aggregated signal
+        All confidence values normalized to 0.0–1.0.
         """
         if len(signals) == 0:
-            return {
-                'action': 'HOLD',
-                'confidence': 0,
-                'reasoning': 'No signals provided',
-                'sources': [],
-                'agreement': 'none'
-            }
-        
+            return {'action': 'HOLD', 'confidence': 0.0, 'reasoning': 'No signals provided',
+                    'sources': [], 'agreement': 'none'}
         if len(signals) == 1:
             return signals[0]
-        
         if len(signals) == 2:
             return self.combine_two(signals[0], signals[1])
-        
+
         # ── Vote Counting ──────────────────────────────────────
-        buy_votes = []
+        buy_votes  = []
         sell_votes = []
         hold_votes = []
-        
+
         for sig in signals:
             action = sig['action']
-            source = sig.get('source', 'Unknown')
-            conf = sig['confidence']
-            
+            source = sig.get('source', sig.get('strategy', 'Unknown'))
+            conf   = self._normalize(sig['confidence'])
+
             if action == 'BUY':
                 buy_votes.append({'source': source, 'confidence': conf})
             elif action == 'SELL':
                 sell_votes.append({'source': source, 'confidence': conf})
             else:
                 hold_votes.append({'source': source, 'confidence': conf})
-        
+
         total_votes = len(signals)
-        buy_count = len(buy_votes)
-        sell_count = len(sell_votes)
-        hold_count = len(hold_votes)
-        
+        buy_count   = len(buy_votes)
+        sell_count  = len(sell_votes)
+        hold_count  = len(hold_votes)
+
         log.info(f"📊 Vote count: BUY={buy_count}, SELL={sell_count}, HOLD={hold_count}")
-        
+
         # ── Determine Winner ───────────────────────────────────
         if buy_count > sell_count and buy_count > hold_count:
-            winner = 'BUY'
-            winner_votes = buy_votes
-            winner_count = buy_count
+            winner, winner_votes, winner_count = 'BUY',  buy_votes,  buy_count
         elif sell_count > buy_count and sell_count > hold_count:
-            winner = 'SELL'
-            winner_votes = sell_votes
-            winner_count = sell_count
+            winner, winner_votes, winner_count = 'SELL', sell_votes, sell_count
         elif hold_count > buy_count and hold_count > sell_count:
-            winner = 'HOLD'
-            winner_votes = hold_votes
-            winner_count = hold_count
+            winner, winner_votes, winner_count = 'HOLD', hold_votes, hold_count
         else:
-            # Tie - default to HOLD
-            winner = 'HOLD'
-            winner_votes = hold_votes
-            winner_count = hold_count
-        
-        # ── Calculate Confidence ───────────────────────────────
-        # Base: Average confidence of winning votes
+            winner, winner_votes, winner_count = 'HOLD', hold_votes, hold_count  # tie → HOLD
+
+        # ── Calculate Confidence (all on 0.0–1.0 scale) ───────
         if winner_votes:
             avg_winner_conf = sum(v['confidence'] for v in winner_votes) / len(winner_votes)
         else:
-            avg_winner_conf = 40
-        
-        # Vote strength: What % of votes went to winner
-        vote_strength = (winner_count / total_votes) * 100
-        
-        # Combined confidence: Average of confidence and vote strength
+            avg_winner_conf = 0.40
+
+        # Vote strength as a 0.0–1.0 fraction
+        vote_strength = winner_count / total_votes   # e.g. 2/3 = 0.667
+
+        # Blend signal quality and voting agreement
         base_confidence = (avg_winner_conf + vote_strength) / 2
-        
-        # Bonus for agreement
+
         if winner_count == total_votes:
-            # Unanimous
-            final_confidence = min(95, base_confidence + 10)
+            final_confidence = min(0.95, base_confidence + 0.10)  # unanimous bonus
             agreement = 'unanimous'
         elif winner_count > total_votes / 2:
-            # Majority
-            final_confidence = min(90, base_confidence + 5)
+            final_confidence = min(0.90, base_confidence + 0.05)  # majority bonus
             agreement = 'majority'
         else:
-            # Weak majority or tie
             final_confidence = base_confidence
             agreement = 'weak'
-        
-        # Build reasoning
+
         sources_list = [v['source'] for v in winner_votes]
-        reasoning = f"{winner_count}/{total_votes} vote {winner}: {', '.join(sources_list)}"
-        
+        reasoning    = f"{winner_count}/{total_votes} vote {winner}: {', '.join(sources_list)}"
+
         result = {
-            'action': winner,
-            'confidence': round(final_confidence, 2),
-            'reasoning': reasoning,
-            'sources': sources_list,
-            'agreement': agreement,
-            'vote_breakdown': {
-                'BUY': buy_count,
-                'SELL': sell_count,
-                'HOLD': hold_count
-            }
+            'action':         winner,
+            'confidence':     round(final_confidence, 4),
+            'reasoning':      reasoning,
+            'sources':        sources_list,
+            'agreement':      agreement,
+            'vote_breakdown': {'BUY': buy_count, 'SELL': sell_count, 'HOLD': hold_count}
         }
-        
-        log.info(f"   🎯 Winner: {winner} @ {result['confidence']}% ({agreement})")
-        
-        # Store in history
+
+        log.info(f"   🎯 Winner: {winner} @ {result['confidence']:.0%} ({agreement})")
+
         self.history.append({
-            'timestamp': __import__('datetime').datetime.now(),
+            'timestamp':     __import__('datetime').datetime.now(),
             'signals_count': len(signals),
-            'result': result
+            'result':        result
         })
-        
+
         return result
     
     def get_statistics(self):
