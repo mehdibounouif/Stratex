@@ -5,11 +5,12 @@ from data.data_engineer import data_access
 import json
 import os
 from logger import setup_logging, get_logger
+from strategies.base_strategy import BaseStrategy
 
 setup_logging()
 logging = get_logger("strategies.rsi_strategy")
 
-class RSIStrategy:
+class RSIStrategy(BaseStrategy):
     """
     RSI Mean Reversion Trading Strategy
     
@@ -18,20 +19,11 @@ class RSIStrategy:
     """
     
     def __init__(self, rsi_buy=25, rsi_sell=75, holding_days=5, stop_loss=0.05):
-        """
-        Initialize strategy with parameters
-        
-        Args:
-            rsi_buy: RSI threshold to trigger buy (default: 25)
-            rsi_sell: RSI threshold to trigger sell (default: 75)
-            holding_days: Maximum holding period (default: 5)
-            stop_loss: Stop loss percentage (default: 0.05 = 5%)
-        """
-        self.rsi_buy = rsi_buy
-        self.rsi_sell = rsi_sell
+        self.rsi_buy     = rsi_buy
+        self.rsi_sell    = rsi_sell
         self.holding_days = holding_days
-        self.stop_loss = stop_loss
-        self.name = "RSI Mean Reversion"
+        self.stop_loss   = stop_loss
+        self.name        = "RSI Mean Reversion"
     
 
     def calculate_rsi(self, prices, period=14):
@@ -57,49 +49,44 @@ class RSIStrategy:
 
     def generate_signal(self, ticker, price_data):
         """
-        Generate trading signal for a stock
-        
-        Args:
-            ticker: Stock symbol
-            price_data: DataFrame with OHLCV data
-        
-        Returns:
-            dict with signal information
+        Generate trading signal for a stock.
+
+        Parameters
+        ----------
+        ticker : str
+        price_data : pd.DataFrame   OHLCV with at least 20 rows
+
+        Returns
+        -------
+        dict  Signal satisfying the BaseStrategy contract.
         """
         if price_data is None or len(price_data) < 20:
-            return self._no_signal(ticker, "Insufficient data")
-        
+            return self._no_signal(ticker, "Insufficient data (need ≥ 20 rows)")
+
         # Calculate RSI
+        price_data = price_data.copy()
         price_data['RSI'] = self.calculate_rsi(price_data['Close'])
-        
-        # Get current values
-        current_rsi = price_data['RSI'].iloc[-1]
+
+        current_rsi   = price_data['RSI'].iloc[-1]
         current_price = price_data['Close'].iloc[-1]
 
-        # Convert to Python floats if needed
-        if hasattr(current_rsi, "item"):
-            current_rsi = current_rsi.item()
-        if hasattr(current_price, "item"):
-            current_price = current_price.item()
-        
-        # Check if RSI is valid
-        if pd.isna(current_rsi):
-            return self._no_signal(ticker, "RSI calculation failed")
-        
-        # Generate signal
+        # Convert numpy scalars to Python floats
+        if hasattr(current_rsi,   'item'): current_rsi   = current_rsi.item()
+        if hasattr(current_price, 'item'): current_price = current_price.item()
+
+        # Guard: NaN or exactly 0 both mean the RSI formula had no valid data
+        # (happens when all gains or all losses in the window are zero)
+        if pd.isna(current_rsi) or current_rsi == 0.0:
+            return self._no_signal(ticker, "RSI calculation returned no valid value")
+
         if current_rsi < self.rsi_buy:
-            # OVERSOLD - BUY signal
             signal = self._buy_signal(ticker, current_price, current_rsi, price_data)
-        
         elif current_rsi > self.rsi_sell:
-            # OVERBOUGHT - SELL signal
             signal = self._sell_signal(ticker, current_price, current_rsi, price_data)
-        
         else:
-            # NEUTRAL - HOLD
             signal = self._hold_signal(ticker, current_price, current_rsi)
-        
-        return signal
+
+        return self._validate(signal)
 
 
     def _buy_signal(self, ticker, price, rsi, price_data):
@@ -190,23 +177,6 @@ class RSIStrategy:
             'timestamp': datetime.now().isoformat()
         }
 
-#    def _sell_signal(self, ticker, price, rsi):
-#        """Create SELL signal"""
-#        confidence = 0.65
-#
-#        return {
-#            'ticker': ticker,
-#            'action': 'SELL',
-#            'signal_type': 'RSI_OVERBOUGHT',
-#            'confidence': confidence,
-#            'current_price': round(price, 2),
-#            'rsi': round(rsi, 1),
-#            'reasoning': f"RSI at {rsi:.1f} indicates overbought condition. "
-#                        f"Take profits before reversal.",
-#            'strategy': self.name,
-#            'timestamp': datetime.now().isoformat()
-#        }
-
     def _hold_signal(self, ticker, price, rsi):
         """Create HOLD signal"""
         return {
@@ -218,19 +188,6 @@ class RSIStrategy:
             'rsi': round(rsi, 1),
             'reasoning': f"RSI at {rsi:.1f} in neutral zone. "
                         f"Wait for clearer signal.",
-            'strategy': self.name,
-            'timestamp': datetime.now().isoformat()
-        }
-    
-
-    def _no_signal(self, ticker, reason):
-        """Create NO SIGNAL response"""
-        return {
-            'ticker': ticker,
-            'action': 'HOLD',
-            'signal_type': 'NO_SIGNAL',
-            'confidence': 0.0,
-            'reasoning': reason,
             'strategy': self.name,
             'timestamp': datetime.now().isoformat()
         }
@@ -255,6 +212,8 @@ class RSIStrategy:
             json.dump(signal, f, indent=2)
 
         logging.info(f"✅ Signal saved: {filepath}")
+
+    
 
     def __str__(self):
         return f"RSIStrategy(buy={self.rsi_buy}, sell={self.rsi_sell}, hold={self.holding_days}d, stop={self.stop_loss:.0%})"
