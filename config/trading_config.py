@@ -30,6 +30,16 @@ class TradingConfig:
     # the 10% cash reserve requirement.
     POSITION_SIZE_PCT = 0.05
 
+
+    # Sizing method: 'fixed_fractional' (simple, default) or 'kelly' (optimal growth)
+    # See risk/position_sizer.py for full explanation of each method.
+    POSITION_SIZING_METHOD = 'fixed_fractional'
+
+    # Kelly Criterion fraction (only used when POSITION_SIZING_METHOD = 'kelly').
+    # 0.5 = half-Kelly — cuts volatility significantly vs full Kelly.
+    # Never go above 1.0 (full Kelly) unless you are very confident in your edge.
+    KELLY_FRACTION = 0.5
+    
     # TradingAgents
     USE_TRADING_AGENT = False
     TRADINGAGENTS_MODEL = 'gpt-4o-mini'
