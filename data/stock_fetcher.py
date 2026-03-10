@@ -5,7 +5,6 @@ Fetches historical and real-time stock price data from Yahoo Finance.
 Integrates with Database class for persistent storage.
 
 Author: Abdilah (Data Engineer)
-Compatible with: database.py, data_engineer.py
 
 FIXES:
 - Robust column name handling for yfinance quirks
@@ -16,10 +15,10 @@ FIXES:
 import pandas as pd
 import yfinance as yf
 import time
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from data.pipelines.data_cleaning import DataCleaner
+from data.retry import retry, fetch_with_retry
 from logger import setup_logging, get_logger
 
 setup_logging()
@@ -49,66 +48,41 @@ class StockDataFetcher:
         logger.info(f"   Rate limit: {self.rate_limit_delay} seconds between calls")
         logger.info(f"   Database: {'Connected' if db else 'Not connected'}")
             
+    @retry(max_attempts=3, base_delay=2.0, exceptions=(Exception,))
     def fetch_stock_prices(self, ticker, start_date, end_date):
         """
         Download historical stock price data for a single ticker.
-        
+        Retries up to 3 times with exponential backoff on any failure.
+
         Returns
         -------
         pd.DataFrame or None
-            DataFrame with columns: Date, Open, High, Low, Close, Volume
         """
         self._enforce_rate_limit()
         logger.info(f"📊 Fetching stock prices for {ticker} ({start_date} to {end_date})")
-        
-        for attempt in range(1, self.max_retries + 1):
-            try:
-                # Download data from yfinance
-                df = yf.download(
-                    ticker,
-                    start=start_date,
-                    end=end_date,
-                    progress=False
-                )
-                
-                if df.empty:
-                    logger.warning(f"⚠️ No data returned for {ticker}")
-                    return None
-                
-                # FIX: Clean up the DataFrame to have simple column names
-                df = self._clean_dataframe(df, ticker)
 
-                if df is None:
-                    logger.error(f"❌ Failed to clean DataFrame for {ticker}")
-                    return None
-                
-                df_clean = self.cleaner.clean_stock_prices(df, ticker)
+        df = yf.download(ticker, start=start_date, end=end_date, progress=False)
 
-                logger.info(f"✅ Downloaded {len(df)} records for {ticker}")
-                
-                # Save to CSV file
-                self._save_to_csv(ticker, df_clean, start_date, end_date)
-                
-                # Save to database
-                if self.db:
-                    self._save_to_database(ticker, df_clean)
-                else:
-                    logger.warning("⚠️ Database not connected. Skipping database save.")
-                
-                return df_clean
-                
-            except Exception as e:
-                logger.error(f"❌ Attempt {attempt}/{self.max_retries} failed for {ticker}: {e}")
-                
-                if attempt < self.max_retries:
-                    wait_time = self.retry_delay * (2 ** (attempt - 1))
-                    logger.info(f"⏳ Retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
-                else:
-                    logger.error(f"❌ All retries exhausted for {ticker}")
-                    import traceback
-                    logger.error(traceback.format_exc())
-                    return None
+        if df is None or df.empty:
+            logger.warning(f"⚠️ No data returned for {ticker}")
+            return None
+
+        df = self._clean_dataframe(df, ticker)
+        if df is None:
+            logger.error(f"❌ Failed to clean DataFrame for {ticker}")
+            return None
+
+        df_clean = self.cleaner.clean_stock_prices(df, ticker)
+        logger.info(f"✅ Downloaded {len(df_clean)} records for {ticker}")
+
+        self._save_to_csv(ticker, df_clean, start_date, end_date)
+
+        if self.db:
+            self._save_to_database(ticker, df_clean)
+        else:
+            logger.warning("⚠️ Database not connected — skipping database save.")
+
+        return df_clean
 
     def _enforce_rate_limit(self):
         """
@@ -216,36 +190,37 @@ class StockDataFetcher:
             logger.error(traceback.format_exc())
             return None
     
+    @retry(max_attempts=3, base_delay=2.0, exceptions=(Exception,))
     def fetch_latest_price(self, ticker):
-        """Get the most recent trading price for a stock."""
+        """
+        Get the most recent trading price for a stock.
+        Retries up to 3 times with exponential backoff.
+        """
         self._enforce_rate_limit()
         logger.info(f"📈 Fetching latest price for {ticker}")
-        
-        try:
-            stock = yf.Ticker(ticker)
-            info = stock.info
-            
-            price = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('previousClose')
-            
-            if price is None:
-                logger.warning(f"⚠️ Could not find price for {ticker}")
-                return None
-            
-            result = {
-                'ticker': ticker,
-                'price': float(price),
-                'timestamp': datetime.now().isoformat(),
-                'volume': info.get('volume', 0),
-                'market_cap': info.get('marketCap', 0),
-                'currency': info.get('currency', 'USD')
-            }
-            
-            logger.info(f"✅ Latest price for {ticker}: ${result['price']:.2f}")
-            return result
-            
-        except Exception as e:
-            logger.error(f"❌ Failed to fetch latest price for {ticker}: {e}")
+
+        stock = yf.Ticker(ticker)
+        info  = stock.info
+
+        price = (info.get('currentPrice')
+                 or info.get('regularMarketPrice')
+                 or info.get('previousClose'))
+
+        if price is None:
+            logger.warning(f"⚠️ Could not find price for {ticker}")
             return None
+
+        result = {
+            'ticker':     ticker,
+            'price':      float(price),
+            'timestamp':  datetime.now().isoformat(),
+            'volume':     info.get('volume', 0),
+            'market_cap': info.get('marketCap', 0),
+            'currency':   info.get('currency', 'USD')
+        }
+
+        logger.info(f"✅ Latest price for {ticker}: ${result['price']:.2f}")
+        return result
     
     def fetch_multiple_stocks(self, tickers, start_date, end_date, delay=1):
         """Download historical data for multiple stocks with rate limiting."""
@@ -429,5 +404,3 @@ if __name__ == "__main__":
     # Cleanup
     db.close()
     logger.info("\n✅ ALL TESTS COMPLETED!")
-
-
