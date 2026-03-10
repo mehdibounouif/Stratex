@@ -85,11 +85,29 @@ class TradingSystem:
         self.report_dir = 'risk/reports'
         os.makedirs(self.report_dir, exist_ok=True)
 
+        # ── Data pipeline health check ─────────────────────────
+        # Runs once at startup. CRITICAL failures are logged as errors
+        # but never crash the system.
+        try:
+            from data.health_check import run_health_check
+            health = run_health_check()
+            self.health_status = health['status']
+            if health['status'] == 'CRITICAL':
+                log.error(
+                    "⚠️  Data pipeline health check: CRITICAL — "
+                    "system may not function correctly. "
+                    "Run: python -m data.health_check for details."
+                )
+        except Exception as e:
+            log.warning(f"Health check could not run: {e}")
+            self.health_status = 'UNKNOWN'
+
         log.info(f"✅ System ready")
         log.info(f"   Environment:  {BaseConfig.ENVIRONMENT}")
         log.info(f"   Capital:      ${TradingConfig.INITIAL_CAPITAL:,.0f}")
         log.info(f"   Watchlist:    {len(self.config.DEFAULT_WATCHLIST)} stocks")
         log.info(f"   AI signals:   {'ON' if self.ta else 'OFF'}")
+        log.info(f"   Data health:  {self.health_status}")
         log.info("=" * 60)
 
     # ================================================================
