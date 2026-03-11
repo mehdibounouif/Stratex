@@ -296,7 +296,7 @@ class DataEngineer:
         This is called when cache is bypassed or stale.
         """
         df = self.stock_fetcher.fetch_stock_prices(ticker, start_date, end_date)
-        
+        print(len(df))
         if df is not None and not df.empty and self.cleaner:
             df = self.cleaner.clean_stock_prices(df, ticker=ticker)
         
