@@ -44,7 +44,6 @@ Automated (cron example):
 """
 
 
-
 import sys
 import time
 from datetime import datetime, timedelta
@@ -58,7 +57,6 @@ setup_logging()
 log = get_logger("pipeline.daily_update")
 
 
-
 # ============================================================================
 # CONFIGURATION
 # ============================================================================
@@ -70,84 +68,10 @@ WATCHLIST = [
     "XOM",  "CVX",
     "TSLA", "HD",
 ]
-"""
-List of tickers monitored by the system.
-
-Description
------------
-This list represents the universe of stocks that the trading system tracks.
-
-Each ticker will go through the full pipeline:
-
-    Fetch historical prices
-    Clean data
-    Retrieve live price
-    Update portfolio valuation
-
-Example
--------
-["AAPL", "MSFT", "NVDA", "GOOGL"]
-"""
-
 
 FETCH_DAYS_BACK         = 5
-"""
-Number of historical days fetched each run.
-
-Purpose
--------
-Ensures that any missing trading days are recovered.
-
-Example
--------
-If FETCH_DAYS_BACK = 5
-
-Pipeline fetches last 5 days of OHLCV data.
-
-Benefits
---------
-- Repairs missing records
-- Handles API outages
-- Ensures continuity of historical data
-"""
-
-
 API_DELAY               = 1.0
-"""
-Delay between API calls.
-
-Purpose
--------
-Avoid hitting API rate limits.
-
-Typical Limits
---------------
-Most financial APIs limit requests to
-~1–2 requests per second.
-
-Example
--------
-API_DELAY = 1.0
-"""
-
-
 UPDATE_PORTFOLIO_PRICES = True
-"""
-Controls whether portfolio prices are updated.
-
-True
------
-Portfolio positions receive updated market prices
-and unrealized P&L is recalculated.
-
-False
-------
-Portfolio valuation remains unchanged.
-
-Use Cases
----------
-Testing pipeline without modifying portfolio state.
-"""
 
 
 # ============================================================================
@@ -160,7 +84,7 @@ def _banner(msg):
     log.info("=" * 60)
 
 def _section(msg):
-    log.info("" )
+    log.info("")
     log.info("-" * 50)
     log.info(f"  {msg}")
     log.info("-" * 50)
@@ -180,47 +104,59 @@ def _is_trading_day():
 
 def connect():
     _section("STEP 1 -- Connecting")
-    """
-    Initialize and connect all system components.
 
-    Returns
-    -------
-    dict
-        Context object containing initialized services.
+    ctx = {}
 
-    Services Created
-    ----------------
-    Database
-        Provides persistent storage for price history.
+    # --- Database ---
+    try:
+        from data.database import Database
+        db = Database()
+        db.connect()
+        db.create_tables()
+        ctx["db"] = db
+        log.info("✅ Database connected")
+    except Exception as e:
+        log.error(f"❌ Failed to connect to database: {e}")
+        return None
 
-    StockDataFetcher
-        Handles communication with market data APIs.
+    # --- StockDataFetcher ---
+    try:
+        from data.stock_fetcher import StockDataFetcher
+        ctx["fetcher"] = StockDataFetcher(db=ctx["db"])
+        log.info("✅ StockDataFetcher ready")
+    except Exception as e:
+        log.error(f"❌ Failed to initialize StockDataFetcher: {e}")
+        return None
 
-    DataCleaner
-        Validates and cleans raw financial data.
+    # --- DataCleaner ---
+    try:
+        from data.pipelines.data_cleaning import DataCleaner
+        ctx["cleaner"] = DataCleaner(db=ctx["db"])
+        log.info("✅ DataCleaner ready")
+    except Exception as e:
+        log.warning(f"⚠️  DataCleaner unavailable: {e}")
+        ctx["cleaner"] = None
 
-    PositionTracker
-        Tracks open portfolio positions.
+    # --- PositionTracker ---
+    try:
+        from risk.portfolio.portfolio_tracker import PositionTracker
+        ctx["tracker"] = PositionTracker(db=ctx["db"])
+        log.info("✅ PositionTracker ready")
+    except Exception as e:
+        log.warning(f"⚠️  PositionTracker unavailable: {e}")
+        ctx["tracker"] = None
 
-    RiskManager
-        Computes portfolio risk metrics.
+    # --- RiskManager ---
+    try:
+        from risk.risk_manager import RiskManager
+        ctx["risk_manager"] = RiskManager(db=ctx["db"])
+        log.info("✅ RiskManager ready")
+    except Exception as e:
+        log.warning(f"⚠️  RiskManager unavailable: {e}")
+        ctx["risk_manager"] = None
 
-    Why a Context Dictionary?
-    -------------------------
-    Allows pipeline steps to share common objects
-    without using global variables.
-
-    Example Context
-    ---------------
-    {
-        "db": Database,
-        "fetcher": StockDataFetcher,
-        "cleaner": DataCleaner,
-        "tracker": PositionTracker,
-        "risk_manager": RiskManager
-    }
-    """
-    pass
+    log.info(f"✅ All services initialized")
+    return ctx
 
 
 # ============================================================================
@@ -229,54 +165,46 @@ def connect():
 
 def fetch_prices(ctx):
     _section(f"STEP 2 -- Fetching prices ({len(WATCHLIST)} tickers)")
-    """
-    Fetch historical OHLCV price data.
 
-    Parameters
-    ----------
-    ctx : dict
-        Shared pipeline context.
+    if ctx is None or "fetcher" not in ctx:
+        log.error("❌ No fetcher in context — skipping price fetch")
+        return {}
 
-    Returns
-    -------
-    dict
-        {ticker: DataFrame}
+    fetcher = ctx["fetcher"]
+    end_date   = datetime.now()
+    start_date = end_date - timedelta(days=FETCH_DAYS_BACK)
 
-    Data Retrieved
-    --------------
-    Open
-    High
-    Low
-    Close
-    Volume
+    start_str = start_date.strftime("%Y-%m-%d")
+    end_str   = end_date.strftime("%Y-%m-%d")
 
-    Time Window
-    -----------
-    Determined by FETCH_DAYS_BACK.
+    results   = {}
+    success   = 0
+    failed    = 0
 
-    Example
-    -------
-    If FETCH_DAYS_BACK = 5
+    for i, ticker in enumerate(WATCHLIST, 1):
+        log.info(f"[{i}/{len(WATCHLIST)}] Fetching {ticker} ...")
+        try:
+            df = fetcher.fetch_stock_prices(ticker, start_str, end_str)
+            results[ticker] = df
 
-    Fetch data from:
+            if df is not None and not df.empty:
+                log.info(f"  ✅ {ticker}: {len(df)} rows")
+                success += 1
+            else:
+                log.warning(f"  ⚠️  {ticker}: no data returned")
+                failed += 1
 
-        today - 5 days
-        to
-        today
+        except Exception as e:
+            log.error(f"  ❌ {ticker}: fetch failed — {e}")
+            results[ticker] = None
+            failed += 1
 
-    Error Handling
-    --------------
-    Failed tickers are recorded but do not stop the pipeline.
+        # Rate limiting — skip delay after last ticker
+        if i < len(WATCHLIST):
+            time.sleep(API_DELAY)
 
-    Why Fetch Multiple Days?
-    ------------------------
-    Protects against:
-
-        Missing trading days
-        Temporary API outages
-        Incomplete historical records
-    """
-    pass
+    log.info(f"✅ Price fetch done: {success} success, {failed} failed")
+    return results
 
 
 # ============================================================================
@@ -285,44 +213,30 @@ def fetch_prices(ctx):
 
 def clean_data(ctx, results):
     _section("STEP 3 -- Cleaning data")
-    """
-    Clean and validate downloaded price data.
 
-    Parameters
-    ----------
-    ctx : dict
-        Pipeline context containing DataCleaner.
+    if ctx is None or ctx.get("cleaner") is None:
+        log.warning("⚠️  DataCleaner not available — skipping cleaning step")
+        return results
 
-    results : dict
-        Raw price data fetched from APIs.
+    cleaner = ctx["cleaner"]
+    cleaned = {}
 
-    Returns
-    -------
-    dict
-        Cleaned price datasets.
+    for ticker, df in results.items():
+        if df is None or df.empty:
+            cleaned[ticker] = df
+            continue
 
-    Cleaning Operations
-    -------------------
-    Duplicate Removal
-        Eliminates repeated rows.
+        try:
+            clean_df = cleaner.clean_stock_prices(df, ticker=ticker)
+            cleaned[ticker] = clean_df
+            log.info(f"  ✅ {ticker}: cleaned ({len(clean_df)} rows)")
+        except Exception as e:
+            log.error(f"  ❌ {ticker}: cleaning failed — {e}")
+            cleaned[ticker] = df   # fall back to raw data
 
-    OHLC Validation
-        Ensures:
-            High >= Open/Close
-            Low <= Open/Close
-
-    Invalid Price Detection
-        Removes negative or zero prices.
-
-    Volume Validation
-        Fixes abnormal volume values.
-
-    Outcome
-    -------
-    Ensures database receives reliable
-    and internally consistent market data.
-    """
-    pass
+    summary = cleaner.get_cleaning_summary()
+    log.info(f"✅ Cleaning complete: {summary}")
+    return cleaned
 
 
 # ============================================================================
@@ -331,38 +245,36 @@ def clean_data(ctx, results):
 
 def fetch_live_prices(ctx):
     _section("STEP 4 -- Fetching live prices")
-    """
-    Fetch current market price for each ticker.
 
-    Parameters
-    ----------
-    ctx : dict
-        Pipeline context containing StockDataFetcher.
+    if ctx is None or "fetcher" not in ctx:
+        log.error("❌ No fetcher in context — skipping live prices")
+        return {}
 
-    Returns
-    -------
-    dict
-        {ticker: live_price}
+    fetcher     = ctx["fetcher"]
+    live_prices = {}
 
-    Purpose
-    -------
-    Historical data is often delayed by one day.
+    for i, ticker in enumerate(WATCHLIST, 1):
+        try:
+            result = fetcher.fetch_latest_price(ticker)
+            if result and "price" in result:
+                price = float(result["price"])
+                live_prices[ticker] = price
+                log.info(f"  ✅ {ticker}: ${price:.2f}")
+            else:
+                log.warning(f"  ⚠️  {ticker}: no live price returned")
+                live_prices[ticker] = None
 
-    Live prices provide:
+        except Exception as e:
+            log.error(f"  ❌ {ticker}: live price fetch failed — {e}")
+            live_prices[ticker] = None
 
-        Real-time portfolio valuation
-        Accurate unrealized P&L
-        Up-to-date risk metrics
+        # Small delay between calls to avoid rate limiting
+        if i < len(WATCHLIST):
+            time.sleep(API_DELAY)
 
-    Example Output
-    --------------
-    {
-        "AAPL": 185.22,
-        "MSFT": 391.80,
-        "NVDA": 875.40
-    }
-    """
-    pass
+    fetched = sum(1 for v in live_prices.values() if v is not None)
+    log.info(f"✅ Live prices: {fetched}/{len(WATCHLIST)} retrieved")
+    return live_prices
 
 
 # ============================================================================
@@ -371,35 +283,33 @@ def fetch_live_prices(ctx):
 
 def update_portfolio(ctx, live_prices):
     _section("STEP 5 -- Updating portfolio prices")
-    """
-    Update portfolio with latest market prices.
 
-    Parameters
-    ----------
-    ctx : dict
-        Pipeline context containing PositionTracker.
+    if not UPDATE_PORTFOLIO_PRICES:
+        log.info("ℹ️  UPDATE_PORTFOLIO_PRICES=False — skipping portfolio update")
+        return
 
-    live_prices : dict
-        Mapping of ticker to latest price.
+    if ctx is None or ctx.get("tracker") is None:
+        log.warning("⚠️  PositionTracker not available — skipping portfolio update")
+        return
 
-    Responsibilities
-    ----------------
-    Update Position Prices
-        Replace old market prices with new values.
+    tracker = ctx["tracker"]
+    updated = 0
+    skipped = 0
 
-    Recalculate Portfolio Metrics
-        - Unrealized P&L
-        - Position values
-        - Portfolio value
+    for ticker, price in live_prices.items():
+        if price is None:
+            skipped += 1
+            continue
 
-    Notes
-    -----
-    Only positions currently held in the portfolio
-    are updated.
+        try:
+            tracker.update_market_price(ticker, price)
+            updated += 1
+            log.info(f"  ✅ {ticker}: portfolio price updated to ${price:.2f}")
+        except Exception as e:
+            log.error(f"  ❌ {ticker}: portfolio update failed — {e}")
+            skipped += 1
 
-    Missing tickers are ignored.
-    """
-    pass
+    log.info(f"✅ Portfolio update: {updated} updated, {skipped} skipped")
 
 
 # ============================================================================
@@ -408,40 +318,24 @@ def update_portfolio(ctx, live_prices):
 
 def print_risk_summary(ctx):
     _section("STEP 6 -- Risk summary")
-    """
-    Print portfolio risk summary.
 
-    Parameters
-    ----------
-    ctx : dict
-        Pipeline context containing RiskManager.
+    if ctx is None or ctx.get("risk_manager") is None:
+        log.warning("⚠️  RiskManager not available — skipping risk summary")
+        return
 
-    Risk Metrics Displayed
-    ----------------------
-    Portfolio Value
-        Total market value of all positions.
+    try:
+        rm      = ctx["risk_manager"]
+        summary = rm.get_portfolio_summary()
 
-    Cash Allocation
-        Percentage of portfolio held in cash.
+        log.info(f"  Portfolio Value   : ${summary.get('portfolio_value', 0):>12,.2f}")
+        log.info(f"  Cash Allocation   : {summary.get('cash_pct', 0):>10.1f}%")
+        log.info(f"  Open Positions    : {summary.get('open_positions', 0):>10}")
+        log.info(f"  Unrealized P&L    : ${summary.get('unrealized_pnl', 0):>12,.2f}")
+        log.info(f"  Realized P&L      : ${summary.get('realized_pnl', 0):>12,.2f}")
+        log.info(f"  Total Return      : {summary.get('total_return_pct', 0):>10.2f}%")
 
-    Open Positions
-        Number of active holdings.
-
-    Unrealized Profit/Loss
-        Profit from open positions.
-
-    Realized Profit/Loss
-        Profit from closed trades.
-
-    Total Return
-        Overall portfolio performance.
-
-    Purpose
-    -------
-    Provides quick visibility into portfolio health
-    after price updates.
-    """
-    pass
+    except Exception as e:
+        log.error(f"❌ Failed to retrieve risk summary: {e}")
 
 
 # ============================================================================
@@ -450,66 +344,67 @@ def print_risk_summary(ctx):
 
 def print_final_report(results, live_prices, start_ts):
     _section("STEP 7 -- Final report")
-    """
-    Print final pipeline execution report.
 
-    Parameters
-    ----------
-    results : dict
-        Cleaned historical data.
+    runtime = (datetime.now() - start_ts).total_seconds()
 
-    live_prices : dict
-        Latest market prices.
+    total    = len(WATCHLIST)
+    success  = sum(1 for df in results.values() if df is not None and not df.empty)
+    failed   = total - success
+    got_live = sum(1 for p in live_prices.values() if p is not None)
 
-    start_ts : datetime
-        Timestamp when pipeline started.
+    log.info(f"  Run timestamp : {start_ts.strftime('%Y-%m-%d  %H:%M:%S')}")
+    log.info(f"  Runtime       : {runtime:.1f} seconds")
+    log.info(f"  Tickers       : {total}")
+    log.info(f"  History OK    : {success}")
+    log.info(f"  History FAIL  : {failed}")
+    log.info(f"  Live prices   : {got_live}/{total}")
 
-    Metrics Displayed
-    -----------------
-    Runtime
-        Total execution time.
+    log.info("")
+    log.info(f"  {'Ticker':<8}  {'Live Price':>12}  {'History':>10}  {'Status'}")
+    log.info(f"  {'-'*8}  {'-'*12}  {'-'*10}  {'-'*8}")
 
-    Success Rate
-        Number of tickers successfully updated.
+    for ticker in WATCHLIST:
+        df    = results.get(ticker)
+        price = live_prices.get(ticker)
 
-    Failures
-        Tickers with missing or failed data.
+        price_str   = f"${price:.2f}" if price else "N/A"
+        history_str = f"{len(df)} rows" if df is not None and not df.empty else "FAILED"
+        status      = "OK" if (df is not None and not df.empty and price) else "PARTIAL" if (df is not None or price) else "FAILED"
 
-    Live Price Table
-        Table of ticker symbols and latest prices.
+        log.info(f"  {ticker:<8}  {price_str:>12}  {history_str:>10}  {status}")
 
-    Purpose
-    -------
-    Provides operational visibility into pipeline
-    performance and data quality.
 
-    Example Output
-    --------------
-    Ticker    Live Price    Status
-    AAPL      $185.22       OK
-    MSFT      $391.80       OK
-    NVDA      $875.40       FAILED
-    """
-    pass
+# ============================================================================
+# MAIN
+# ============================================================================
 
 def main():
     start_ts = datetime.now()
     _banner(f"DAILY UPDATE  --  {start_ts.strftime('%Y-%m-%d  %H:%M')}")
+
     if not _is_trading_day() and "--force" not in sys.argv:
         log.info("Today is a weekend -- skipping. Use --force to override.")
         return
+
     ctx     = connect()
+    if ctx is None:
+        log.error("❌ Aborting — failed to connect system components.")
+        return
+
     results = fetch_prices(ctx)
     results = clean_data(ctx, results)
     live    = fetch_live_prices(ctx)
     update_portfolio(ctx, live)
     print_risk_summary(ctx)
     print_final_report(results, live, start_ts)
+
     try:
         ctx["db"].close()
     except Exception:
         pass
+
     _banner("DAILY UPDATE COMPLETE")
+
 
 if __name__ == "__main__":
     main()
