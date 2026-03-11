@@ -519,6 +519,3 @@ if __name__ == "__main__":
         raise SystemExit(1)
 
     print("\n✅ All tickers passed — ready to build _generate_signal()")
-
-
-

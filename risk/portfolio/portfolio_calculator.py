@@ -681,7 +681,7 @@ class PortfolioCalculator:
             Daily Decimal portfolio returns. None on failure.
         """
         try:
-            returns = prices[tickers].pct_change().dropna()
+            returns = prices[tickers].pct_change(fill_method=None).dropna()
 
             if returns.empty:
                 logger.warning("Not enough price history to compute returns.")
@@ -1000,26 +1000,29 @@ class PortfolioCalculator:
                 logger.warning("Portfolio value is zero or negative.")
                 return {}
 
-            # --- 3. Build a daily portfolio value series ---
-            # Convert prices to Decimal for precision
-            decimal_prices = prices[tickers].applymap(lambda x: Decimal(str(x)))
-            first_prices   = decimal_prices.iloc[0]  # prices on day 1
-
-            # Each day: weighted sum of (today's price / day-1 price) for each stock
-            # This gives a normalized index (starts at 1.0), then we scale by portfolio value
-            daily_values = decimal_prices.apply(
+            # --- 3. Build a daily portfolio value series using pure float arithmetic ---
+            # Decimal inside a pandas object-dtype Series multiplied by Decimal or mixed
+            # with float raises TypeError in Python 3.11+. No Decimal needed here.
+            portfolio_value_float = float(portfolio_value)
+            weights_float = [float(weights[i]) for i in range(len(tickers))]
+            float_prices  = prices[tickers].astype(float)
+            first_float   = float_prices.iloc[0]
+            daily_values  = float_prices.apply(
                 lambda row: sum(
-                    (row[t] / first_prices[t]) * weights[i]
-                    for i, t in enumerate(tickers)),axis=1
-                ) * portfolio_value
+                    (row[t] / first_float[t]) * weights_float[i]
+                    for i, t in enumerate(tickers)), axis=1
+                ) * portfolio_value_float
+            # Restore DatetimeIndex — apply(axis=1) drops it to integer index
+            daily_values.index = float_prices.index
 
             if daily_values.empty:
                 return {}
 
             # --- 4. Walk through each day to find the worst drawdown ---
-            peak        = daily_values.iloc[0]   # highest value seen so far
+            # daily_values is now a plain float Series — no Decimal needed here.
+            peak        = float(daily_values.iloc[0])
             peak_date   = daily_values.index[0]
-            max_dd      = Decimal("0")           # worst drawdown seen (negative number)
+            max_dd      = 0.0                    # worst drawdown seen (negative number)
             best_peak   = peak                   # peak that led to the worst drawdown
             best_peak_date   = peak_date
             trough_val  = peak
@@ -1044,9 +1047,9 @@ class PortfolioCalculator:
 
             # --- 5. Return results ---
             result = {
-                "max_drawdown" : round(max_dd,      6),
-                "peak_value"   : round(best_peak,   2),
-                "trough_value" : round(trough_val,  2),
+                "max_drawdown" : round(Decimal(str(max_dd)),     6),
+                "peak_value"   : round(Decimal(str(best_peak)),  2),
+                "trough_value" : round(Decimal(str(trough_val)), 2),
                 "peak_date"    : str(best_peak_date.date()),
                 "trough_date"  : str(trough_date.date()),
             }
