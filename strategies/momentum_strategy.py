@@ -13,6 +13,7 @@ Author: Kawtar
 import pandas as pd
 from decimal import Decimal
 import numpy as np
+from datetime import datetime
 from logger import get_logger, setup_logging
 from strategies.base_strategy import BaseStrategy
 
@@ -80,92 +81,27 @@ class MomentumStrategy(BaseStrategy):
     def generate_signal(self, ticker: str, price_data=None) -> dict:
         """
         Analyze a stock's momentum and generate a signal.
-
-        Parameters
-        ----------
-
-        ticker : str
-            Stock symbol to analyze.
-
-            Examples:
-
-                "AAPL"
-                "MSFT"
-                "NVDA"
-
-        df : pandas.DataFrame, optional
-            Historical OHLCV price data.
-
-            Required columns:
-
-                Date
-                Open
-                High
-                Low
-                Close
-                Volume
-
-            If no dataframe is provided, the strategy
-            automatically retrieves data using:
-
-                data_access.get_price_history()
-
-        Data Retrieval Process
-        ----------------------
-
-        If `df` is None:
-
-            1. Strategy calculates required history length
-            2. Calls data_access.get_price_history()
-            3. Receives cached or freshly downloaded data
-
-        This ensures efficient reuse of market data.
-
-        Data Requirements
-        -----------------
-
-        The dataset must contain enough rows to compute
-        the largest indicator window.
-
-        Required rows:
-
-            max(roc_period, slow_ma, price_ma) + buffer
-
-        Example:
-
-            roc_period = 20
-            slow_ma = 30
-            price_ma = 50
-
-            Required ≈ 55 days.
-
-        If insufficient data is available,
-        the strategy returns HOLD.
-
-        Processing Steps
-        ----------------
-
-        1. Retrieve historical price data
-        2. Validate dataset length
-        3. Normalize column names
-        4. Clean numeric price data
-        5. Compute momentum indicators
-        6. Generate trading signal
-        7. Return standardized signal dictionary
-
-        Returns
-        -------
-
-        dict
-
-        {
-            "action": BUY | SELL | HOLD,
-            "confidence": 0-100,
-            "reasoning": explanation string,
-            "source": "Momentum",
-            "indicators": {...}
-        }
+        (See docstring above for full details.)
         """
+        if price_data is None:
+            days_needed = max(self.roc_period, self.slow_ma, self.price_ma) + 10
+            price_data = self.data_access.get_price_history(ticker, days=days_needed)
+
+        min_rows = max(self.roc_period, self.slow_ma, self.price_ma) + 2
+        if price_data is None or len(price_data) < min_rows:
+            log.warning(f"⚠️ [{ticker}] Insufficient data — returning HOLD")
+            return self._no_signal(ticker, f"Insufficient data (need ≥ {min_rows} rows)")
+
+        indicators = self._calculate_indicators(price_data)
+
+        if not indicators:
+            log.warning(f"⚠️ [{ticker}] _calculate_indicators() returned empty — returning HOLD")
+            return self._no_signal(ticker, "Indicator calculation failed")
+
+        signal = self._generate_signal(ticker, indicators)
+
+        return self._validate(signal)
+
 
     def _calculate_indicators(self, df: pd.DataFrame) -> dict:
         """
@@ -240,6 +176,7 @@ class MomentumStrategy(BaseStrategy):
             indicator values.
         """
         try:
+            #checks the names in the columns and normalize them to lowercase
             df.columns = [c.lower() for c in df.columns]
         except Exception as e:
             log.error(f"❌ Failed to normalize column names: {e}")
@@ -250,12 +187,13 @@ class MomentumStrategy(BaseStrategy):
             return {}
 
         min_required = max(self.roc_period, self.slow_ma, self.price_ma) + 2
-
+        #checks if the N of rows in the data frame are enough
         if len(df) < min_required:
             log.warning(f"⚠️ Insufficient data: {len(df)} rows, need {min_required}.")
             return {}
 
         try:
+            #converts the data to pd series with one columns of closing prices
             closes = pd.Series(
                 [Decimal(str(x)) for x in df["close"].values],
                 index=df.index
@@ -266,6 +204,7 @@ class MomentumStrategy(BaseStrategy):
 
         if closes.isnull().any():
             closes = closes.dropna()
+            #dropna drops the null values and recompute the closes
             if len(closes) < min_required:
                 log.error(f"❌ After dropping NaNs: {len(closes)} rows, need {min_required}.")
                 return {}
@@ -288,6 +227,7 @@ class MomentumStrategy(BaseStrategy):
             return {}
 
         try:
+            #drops the days (NAN) that are no in the range for the ma and then computes the ma for the left values in the closes
             fast_ma_series  = closes.rolling(window=self.fast_ma).mean()
             slow_ma_series  = closes.rolling(window=self.slow_ma).mean()
             price_ma_series = closes.rolling(window=self.price_ma).mean()
@@ -305,6 +245,7 @@ class MomentumStrategy(BaseStrategy):
                 "slow_ma_yesterday" : slow_ma_yesterday,
                 "price_ma_today"    : price_ma_today,
             }.items():
+                #it tranfer the values into strings to check if any of it is none
                 if str(val) == "NaN":
                     log.error(f"❌ {name} is NaN — increase days in get_price_history().")
                     return {}
@@ -377,76 +318,164 @@ class MomentumStrategy(BaseStrategy):
             log.error(f"❌ Failed to pack indicators dict: {e}")
             return {}
 
+
     def _generate_signal(self, ticker: str, ind: dict) -> dict:
-        """
-        Convert indicator values into a trading signal.
 
-        Decision Method
-        ---------------
-
-        The strategy uses a **majority voting system**.
-
-        Each indicator casts a vote:
-
-            BUY
-            SELL
-            HOLD
-
-        Indicators Voting
-        -----------------
-
-        • Rate of Change
-        • Moving Average crossover
-        • Price relative to moving average
-
-        Final decision is determined by the majority.
-
-        Example
-        -------
-
-        Indicator votes:
-
-            ROC → BUY
-            MA crossover → BUY
-            Price vs MA → HOLD
-
-        Final decision:
-
-            BUY (2 out of 3 votes)
-
-        Confidence Calculation
-        ----------------------
-
-        Confidence reflects the level of agreement.
-
-            3/3 votes → strong signal (~90%)
-            2/3 votes → moderate signal (~70%)
-            1/3 votes → weak signal (~50%)
-
-        Momentum Boost
-        --------------
-
-        If momentum is extremely strong:
-
-            ROC > 2 × threshold
-
-        confidence is slightly increased.
-
-        Returns
-        -------
-
-        dict
-
-        {
-            "action": BUY | SELL | HOLD,
-            "confidence": 0-100,
-            "reasoning": explanation string,
-            "source": "Momentum",
-            "indicators": indicator dictionary
+        required_keys = {
+            "roc", "price_vs_ma_pct", "golden_cross", "death_cross",
+            "price_today", "fast_ma", "slow_ma"
         }
-        """
+        missing = required_keys - ind.keys()
+        if missing:
+            log.error(f"❌ [{ticker}] Missing indicator keys: {missing}")
+            return self._no_signal(ticker, f"Missing indicators: {missing}")
 
-momentum_strategy = MomentumStrategy()
+        try:
+            roc          = ind["roc"]
+            price_vs_ma  = ind["price_vs_ma_pct"]
+            golden_cross = ind["golden_cross"]
+            death_cross  = ind["death_cross"]
+            price_today  = ind["price_today"]
+            fast_ma      = ind["fast_ma"]
+            slow_ma      = ind["slow_ma"]
+            threshold    = Decimal(str(self.roc_threshold))
+            tolerance    = Decimal("2.0")
+        except Exception as e:
+            log.error(f"❌ [{ticker}] Failed to unpack indicators: {e}")
+            return self._no_signal(ticker, "Indicator unpacking failed")
+
+        for name, val in {
+            "roc"         : roc,
+            "price_vs_ma" : price_vs_ma,
+            "price_today" : price_today,
+            "fast_ma"     : fast_ma,
+            "slow_ma"     : slow_ma,
+        }.items():
+            if val is None or str(val) == "NaN":
+                log.error(f"❌ [{ticker}] {name} is invalid: {val}")
+                return self._no_signal(ticker, f"Invalid indicator value: {name}={val}")
+
+        if price_today <= 0:
+            log.error(f"❌ [{ticker}] price_today is non-positive: {price_today}")
+            return self._no_signal(ticker, f"Invalid price: {price_today}")
+
+        try:
+            if roc > threshold:
+                roc_vote = "BUY"
+            elif roc < -threshold:
+                roc_vote = "SELL"
+            else:
+                roc_vote = "HOLD"
+        except Exception as e:
+            log.error(f"❌ [{ticker}] ROC vote failed: {e}")
+            return self._no_signal(ticker, "ROC vote failed")
+
+        try:
+            if golden_cross:
+                crossover_vote = "BUY"
+            elif death_cross:
+                crossover_vote = "SELL"
+            else:
+                #we need to recheck the fast ma vs slow because the crossover doesn't happen often so the trend may be up or down and the co still says hold
+                if fast_ma > slow_ma:
+                    crossover_vote = "BUY"
+                elif fast_ma < slow_ma:
+                    crossover_vote = "SELL"
+                else:
+                    crossover_vote = "HOLD"
+        except Exception as e:
+            log.error(f"❌ [{ticker}] Crossover vote failed: {e}")
+            return self._no_signal(ticker, "Crossover vote failed")
+
+        try:
+            if price_vs_ma > tolerance:
+                price_ma_vote = "BUY"
+            elif price_vs_ma < -tolerance:
+                price_ma_vote = "SELL"
+            else:
+                price_ma_vote = "HOLD"
+        except Exception as e:
+            log.error(f"❌ [{ticker}] Price vs MA vote failed: {e}")
+            return self._no_signal(ticker, "Price vs MA vote failed")
+
+        votes      = [roc_vote, crossover_vote, price_ma_vote]
+        buy_count  = votes.count("BUY")
+        sell_count = votes.count("SELL")
+
+        log.info(
+            f"[{ticker}] Votes → "
+            f"ROC:{roc_vote} | Crossover:{crossover_vote} | PriceVsMA:{price_ma_vote} | "
+            f"BUY={buy_count} SELL={sell_count}"
+        )
+
+        if buy_count > sell_count and buy_count >= 2:
+            action      = "BUY"
+            agree_count = buy_count
+        elif sell_count > buy_count and sell_count >= 2:
+            action      = "SELL"
+            agree_count = sell_count
+        else:
+            action      = "HOLD"
+            agree_count = max(buy_count, sell_count)
+
+        if agree_count == 3:
+            base_confidence = Decimal("0.90")
+        elif agree_count == 2:
+            base_confidence = Decimal("0.70")
+        else:
+            base_confidence = Decimal("0.50")
+
+        momentum_boost = Decimal("0.0")
+        if action == "BUY"  and roc >  2 * threshold:
+            momentum_boost = Decimal("0.05")
+        elif action == "SELL" and roc < -(2 * threshold):
+            momentum_boost = Decimal("0.05")
+
+        confidence = min(base_confidence + momentum_boost, Decimal("0.95"))
+
+        cross_str = (
+            "Golden Cross detected. " if golden_cross else
+            "Death Cross detected. "  if death_cross  else ""
+        )
+
+        reasoning = (
+            f"Momentum analysis ({agree_count}/3 indicators agree on {action}). "
+            f"ROC({self.roc_period}d)={roc} (threshold +/-{threshold}). "
+            f"{cross_str}"
+            f"Price is {price_vs_ma} vs {self.price_ma}-day MA (tolerance +/-{tolerance}%). "
+            f"Votes → ROC:{roc_vote} | Crossover:{crossover_vote} | PriceVsMA:{price_ma_vote}."
+        )
+
+        signal = {
+            "ticker"        : ticker,
+            "action"        : action,
+            "signal_type"   : f"MOMENTUM_{action}",
+            "confidence"    : confidence,
+            "current_price" : price_today,
+            "reasoning"     : reasoning,
+            "source"        : "Momentum",
+            "strategy"      : "MomentumStrategy",
+            "indicators"    : ind,
+            "timestamp"     : datetime.now().isoformat(),
+        }
+
+        log.info(
+            f"✅ [{ticker}] Signal → {action} | "
+            f"Confidence={confidence} | "
+            f"Price={price_today}"
+        )
+
+        return self._validate(signal)
+
+
+try:
+    momentum_strategy = MomentumStrategy()
+    log.info("✅ momentum_strategy singleton ready")
+except Exception as e:
+    log.error(f"❌ Failed to initialize momentum_strategy singleton: {e}")
+    momentum_strategy = None
+
+
 # ══════════════════════════════════════════════════════════════
 # DEMO & TESTING
 # ══════════════════════════════════════════════════════════════

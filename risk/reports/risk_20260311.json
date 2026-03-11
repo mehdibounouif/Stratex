@@ -1,0 +1,29 @@
+{
+  "date": "2026-03-11T15:04:14.339253",
+  "portfolio": {
+    "portfolio_value": 10213.11,
+    "cash": 8885.0,
+    "cash_pct": 87.0,
+    "positions": 2,
+    "unrealized_pnl": 168.11,
+    "realized_pnl": 45.0,
+    "return_pct": -48.93
+  },
+  "risk_metrics": {
+    "annual_volatility": 0.7145356652366134,
+    "sharpe_ratio": -0.1016,
+    "var_95_10d": {
+      "var_dollar": 41.48,
+      "var_percent": 0.004061,
+      "confidence": 0.95
+    },
+    "max_drawdown": {}
+  },
+  "sector": {},
+  "concentration": {},
+  "scan_results": {
+    "executed_buy": [],
+    "executed_sell": [],
+    "rejected": []
+  }
+}
