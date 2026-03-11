@@ -277,10 +277,10 @@ def test_weekly_pipeline_structure():
 
     try:
         assert callable(getattr(wf, "_api_key_configured", None))
-        assert wf._api_key_configured("real_key_abc") is True
-        assert wf._api_key_configured("your_alpha_vantage_key_here") is False
-        assert wf._api_key_configured("") is False
-        assert wf._api_key_configured(None) is False
+        assert bool(wf._api_key_configured("real_key_abc")) is True
+        assert bool(wf._api_key_configured("your_alpha_vantage_key_here")) is False
+        assert bool(wf._api_key_configured("")) is False
+        assert bool(wf._api_key_configured(None)) is False
         ok("_api_key_configured() validates correctly")
     except Exception as e:
         fail("_api_key_configured()", str(e))

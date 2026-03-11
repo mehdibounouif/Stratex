@@ -140,7 +140,7 @@ def connect():
     # --- PositionTracker ---
     try:
         from risk.portfolio.portfolio_tracker import PositionTracker
-        ctx["tracker"] = PositionTracker(db=ctx["db"])
+        ctx["tracker"] = PositionTracker()
         log.info("✅ PositionTracker ready")
     except Exception as e:
         log.warning(f"⚠️  PositionTracker unavailable: {e}")
@@ -149,7 +149,7 @@ def connect():
     # --- RiskManager ---
     try:
         from risk.risk_manager import RiskManager
-        ctx["risk_manager"] = RiskManager(db=ctx["db"])
+        ctx["risk_manager"] = RiskManager()
         log.info("✅ RiskManager ready")
     except Exception as e:
         log.warning(f"⚠️  RiskManager unavailable: {e}")
@@ -302,7 +302,7 @@ def update_portfolio(ctx, live_prices):
             continue
 
         try:
-            tracker.update_market_price(ticker, price)
+            tracker.update_prices(live_prices)
             updated += 1
             log.info(f"  ✅ {ticker}: portfolio price updated to ${price:.2f}")
         except Exception as e:
@@ -325,7 +325,7 @@ def print_risk_summary(ctx):
 
     try:
         rm      = ctx["risk_manager"]
-        summary = rm.get_portfolio_summary()
+        summary = rm.get_risk_summary()
 
         log.info(f"  Portfolio Value   : ${summary.get('portfolio_value', 0):>12,.2f}")
         log.info(f"  Cash Allocation   : {summary.get('cash_pct', 0):>10.1f}%")

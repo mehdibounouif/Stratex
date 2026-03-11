@@ -325,7 +325,7 @@ def fetch_news(ctx):
                 continue
 
             # Fetch from API
-            articles = fetcher.fetch_news(ticker, days=NEWS_DAYS_BACK)
+            articles = fetcher.fetch_market_news(ticker, days=NEWS_DAYS_BACK)
 
             if articles is not None:
                 results[ticker] = articles

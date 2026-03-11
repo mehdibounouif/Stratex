@@ -126,7 +126,17 @@ class DataCleaner:
 
         # Step 9: Validate volume data
         df = self._validate_volumes(df)
-
+        print("\n" + "+" * 40)
+        print(f" CLEANING STATISTICS: {label}")
+        print("+" * 40)
+        
+        for key, value in self.stats.items():
+            # Formatting the key to look nicer (e.g., "outliers_detected" -> "Outliers Detected")
+            clean_key = key.replace('_', ' ').title()
+            # :25 ensures the text is padded so the numbers align vertically
+            print(f"{clean_key:25} : {value}")
+            
+        print("+" * 40 + "\n")
         logger.info(f"✅ Cleaned [{label}]: {len(df)} rows remain")
         return df
 
