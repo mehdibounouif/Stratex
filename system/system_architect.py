@@ -35,6 +35,8 @@ from config import BaseConfig, TradingConfig, RiskConfig
 from data.data_engineer import data_access
 from strategies.strategy_researcher import strategy_engine   # owns ALL strategy instances
 from risk.risk_manager import risk_manager
+from risk.position_sizer import PositionSizer
+from risk.trade_audit import trade_audit
 from system.signal_aggregator import SignalAggregator
 from logger import setup_logging, get_logger
 
@@ -70,6 +72,8 @@ class TradingSystem:
         self.risk       = risk_manager
         self.config     = TradingConfig()
         self.rconfig    = RiskConfig()
+        self.sizer      = PositionSizer()        # position sizing (fixed fractional or Kelly)
+        self.audit      = trade_audit            # JSONL trade audit log
 
         # TradingAgents (AI signal) — optional
         self.ta = None
@@ -87,7 +91,7 @@ class TradingSystem:
 
         # ── Data pipeline health check ─────────────────────────
         # Runs once at startup. CRITICAL failures are logged as errors
-        # but never crash the system.
+        # but never crash the system — Mehdi can decide whether to abort.
         try:
             from data.health_check import run_health_check
             health = run_health_check()
@@ -278,6 +282,14 @@ class TradingSystem:
                 )
                 pnl = float(result['realized_pnl']) if result else 0
                 log.info(f"   ✅ {reason}: sold {ticker} — P&L: ${pnl:+,.2f}")
+                self.audit.record_stop_loss(
+                    ticker=ticker,
+                    entry_price=float(position.entry_price),
+                    exit_price=current_price,
+                    quantity=int(float(position.quantity)),
+                    realized_pnl=pnl,
+                    reason=reason,
+                )
                 return True
             except Exception as e:
                 log.error(f"   ❌ Force sell failed for {ticker}: {e}")
@@ -407,6 +419,14 @@ class TradingSystem:
                 log.info(
                     f"   ⏸️  LOW CONFIDENCE: {confidence:.0%} < {min_confidence:.0%} minimum — HOLD"
                 )
+                self.audit.record(
+                    ticker=ticker, outcome='HELD', action='HOLD',
+                    quantity=0, price=combined.get('current_price', 0.0),
+                    signal=combined,
+                    approval={'approved': False,
+                               'reason': f'confidence {confidence:.0%} < minimum {min_confidence:.0%}',
+                               'checks': {}},
+                )
                 return self._result(
                     ticker, 'HOLD', 'LOW_CONFIDENCE',
                     f"Signal confidence {confidence:.0%} below minimum {min_confidence:.0%}",
@@ -422,6 +442,11 @@ class TradingSystem:
                 return self._handle_sell(ticker, combined)
             else:
                 log.info(f"   ⏸️  HOLD — no trade executed for {ticker}")
+                self.audit.record(
+                    ticker=ticker, outcome='HELD', action='HOLD',
+                    quantity=0, price=combined.get('current_price', 0.0),
+                    signal=combined,
+                )
                 return self._result(ticker, 'HOLD', 'SIGNAL_HOLD',
                                     combined.get('reasoning', 'Strategy says HOLD'),
                                     signal=combined)
@@ -435,13 +460,14 @@ class TradingSystem:
         """
         Process a BUY signal through pre-trade checks, risk gate, and execution.
 
-        Pre-trade checks (before risk manager):
-        1. Duplicate guard  — skip if we already own this ticker
-        2. Price validity   — reject if price is 0 or missing
-        3. Quantity check   — reject if we can't afford even 1 share
-
-        Then the 6-check risk gate runs (position size, cash reserve,
-        max positions, sector exposure, daily loss, max drawdown).
+        Flow:
+        1. Duplicate guard       — skip if we already own this ticker
+        2. Price validity        — reject if price is 0 or missing
+        3. PositionSizer         — calculate quantity from portfolio & confidence
+        4. Quantity check        — reject if sizer returns 0 shares
+        5. Risk gate (6 checks)  — approve_trade()
+        6. Execute               — tracker.add_position()
+        7. TradeAudit            — record outcome regardless of result
         """
         current_price = signal.get('current_price', 0.0)
         confidence    = signal.get('confidence', 0.0)
@@ -469,34 +495,27 @@ class TradingSystem:
                 signal=signal
             )
 
-        # ── Calculate position size ────────────────────────────
-        # Use config-driven percentage (default 5% of portfolio per trade).
-        # Confidence scaling: high-confidence signals get up to 7%, low get 3%.
-        # This keeps position sizing simple but slightly adaptive.
-        portfolio_value    = self.risk.portfolio_value
-        base_size_pct      = self.config.POSITION_SIZE_PCT   # 0.05
-
-        # Scale ±2% around base based on confidence (0.55–1.0 range maps to 3%–7%)
-        confidence_range   = 1.0 - self.config.MIN_SIGNAL_CONFIDENCE   # 0.45
-        confidence_above   = confidence - self.config.MIN_SIGNAL_CONFIDENCE
-        confidence_scalar  = confidence_above / confidence_range if confidence_range > 0 else 0
-        adjusted_size_pct  = base_size_pct + (confidence_scalar * 0.02) - 0.01  # ±2% adj
-        adjusted_size_pct  = max(0.03, min(0.07, adjusted_size_pct))  # clamp 3%–7%
-
-        trade_value = portfolio_value * adjusted_size_pct
-        quantity    = int(trade_value / current_price)
+        # ── Position sizing via PositionSizer ─────────────────
+        sizing = self.sizer.calculate(
+            portfolio_value = self.risk.portfolio_value,
+            current_price   = current_price,
+            confidence      = confidence,
+            signal          = signal,
+        )
+        quantity = sizing['quantity']
 
         # ── Pre-check 3: Quantity validity ─────────────────────
         if quantity < 1:
-            log.warning(
-                f"   ❌ Cannot afford 1 share of {ticker} "
-                f"@ ${current_price:.2f} "
-                f"(trade budget: ${trade_value:,.0f})"
+            log.warning(f"   ❌ Sizer returned 0 shares: {sizing['reasoning']}")
+            self.audit.record(
+                ticker=ticker, outcome='REJECTED', action='BUY',
+                quantity=0, price=current_price,
+                signal=signal,
+                approval={'approved': False, 'reason': sizing['reasoning'], 'checks': {}},
+                sizing=sizing,
             )
             return self._result(
-                ticker, 'HOLD', 'TOO_SMALL',
-                f'Cannot afford even 1 share at ${current_price:.2f}',
-                signal=signal
+                ticker, 'HOLD', 'TOO_SMALL', sizing['reasoning'], signal=signal
             )
 
         trade_proposal = {
@@ -515,7 +534,7 @@ class TradingSystem:
             f"\n      Quantity:   {quantity} shares"
             f"\n      Price:      ${current_price:.2f}"
             f"\n      Value:      ${quantity * current_price:,.2f}"
-            f"\n      Size:       {adjusted_size_pct:.1%} of portfolio"
+            f"\n      Size:       {sizing['size_pct']:.1%} ({sizing['method']})"
             f"\n      Confidence: {confidence:.0%}"
         )
 
@@ -524,6 +543,11 @@ class TradingSystem:
 
         if not approval['approved']:
             log.warning(f"   ❌ Risk rejected: {approval['reason']}")
+            self.audit.record(
+                ticker=ticker, outcome='REJECTED', action='BUY',
+                quantity=quantity, price=current_price,
+                signal=signal, approval=approval, sizing=sizing,
+            )
             return self._result(
                 ticker, 'HOLD', 'REJECTED', approval['reason'],
                 signal=signal, approval=approval
@@ -540,7 +564,11 @@ class TradingSystem:
                 f"   ✅ EXECUTED: BUY {quantity} × {ticker} "
                 f"@ ${current_price:.2f} = ${quantity * current_price:,.2f}"
             )
-
+            self.audit.record(
+                ticker=ticker, outcome='EXECUTED', action='BUY',
+                quantity=quantity, price=current_price,
+                signal=signal, approval=approval, sizing=sizing,
+            )
             return {
                 'ticker':    ticker,
                 'action':    'BUY',
@@ -549,11 +577,19 @@ class TradingSystem:
                 'value':     round(quantity * current_price, 2),
                 'status':    'EXECUTED',
                 'signal':    signal,
-                'approval':  approval
+                'approval':  approval,
+                'sizing':    sizing,
             }
 
         except Exception as e:
             log.error(f"   ❌ Execution failed for {ticker}: {e}")
+            self.audit.record(
+                ticker=ticker, outcome='REJECTED', action='BUY',
+                quantity=quantity, price=current_price,
+                signal=signal,
+                approval={'approved': False, 'reason': str(e), 'checks': {}},
+                sizing=sizing,
+            )
             return self._result(
                 ticker, 'HOLD', 'EXEC_FAILED', str(e),
                 signal=signal, approval=approval
@@ -585,12 +621,13 @@ class TradingSystem:
             )
 
         entry_price  = float(position.entry_price)
+        qty          = float(position.quantity)
         unrealized   = (current_price - entry_price) / entry_price if entry_price > 0 else 0
 
         trade_proposal = {
             'ticker':        ticker,
             'action':        'SELL',
-            'quantity':      float(position.quantity),
+            'quantity':      qty,
             'current_price': current_price,
             'confidence':    confidence,
             'reasoning':     signal.get('reasoning', '')
@@ -600,7 +637,7 @@ class TradingSystem:
             f"\n   📋 Trade proposal:"
             f"\n      Action:     SELL"
             f"\n      Ticker:     {ticker}"
-            f"\n      Quantity:   {float(position.quantity):.0f} shares"
+            f"\n      Quantity:   {qty:.0f} shares"
             f"\n      Entry:      ${entry_price:.2f}"
             f"\n      Current:    ${current_price:.2f}"
             f"\n      Unrealized: {unrealized:+.1%}"
@@ -612,6 +649,11 @@ class TradingSystem:
 
         if not approval['approved']:
             log.warning(f"   ❌ Sell rejected: {approval['reason']}")
+            self.audit.record(
+                ticker=ticker, outcome='REJECTED', action='SELL',
+                quantity=int(qty), price=current_price,
+                signal=signal, approval=approval,
+            )
             return self._result(
                 ticker, 'HOLD', 'REJECTED', approval['reason'],
                 signal=signal, approval=approval
@@ -621,28 +663,39 @@ class TradingSystem:
         try:
             result = self.tracker.remove_position(
                 ticker=ticker,
-                quantity=float(position.quantity),
+                quantity=qty,
                 exit_price=current_price
             )
-            pnl = float(result['realized_pnl']) if result else 0
+            pnl = float(result['realized_pnl']) if result else 0.0
             log.info(
-                f"   ✅ EXECUTED: SELL {float(position.quantity):.0f} × {ticker} "
+                f"   ✅ EXECUTED: SELL {qty:.0f} × {ticker} "
                 f"@ ${current_price:.2f}  |  Realized P&L: ${pnl:+,.2f}"
             )
-
+            self.audit.record(
+                ticker=ticker, outcome='EXECUTED', action='SELL',
+                quantity=int(qty), price=current_price,
+                signal=signal, approval=approval,
+                realized_pnl=pnl,
+            )
             return {
                 'ticker':       ticker,
                 'action':       'SELL',
-                'quantity':     float(position.quantity),
+                'quantity':     qty,
                 'price':        current_price,
                 'realized_pnl': round(pnl, 2),
                 'status':       'EXECUTED',
                 'signal':       signal,
-                'approval':     approval
+                'approval':     approval,
             }
 
         except Exception as e:
             log.error(f"   ❌ Sell execution failed for {ticker}: {e}")
+            self.audit.record(
+                ticker=ticker, outcome='REJECTED', action='SELL',
+                quantity=int(qty), price=current_price,
+                signal=signal,
+                approval={'approved': False, 'reason': str(e), 'checks': {}},
+            )
             return self._result(
                 ticker, 'HOLD', 'EXEC_FAILED', str(e),
                 signal=signal, approval=approval

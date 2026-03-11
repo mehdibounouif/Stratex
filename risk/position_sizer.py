@@ -38,32 +38,7 @@ retaining most of the growth benefit.
 Full Kelly can recommend putting 30–40% of portfolio in a single trade.
 Half-Kelly with our caps never exceeds MAX_POSITION_SIZE (15%).
 
-USAGE
------
-    from risk.position_sizer import PositionSizer
-
-    sizer  = PositionSizer()
-    result = sizer.calculate(
-        portfolio_value = 20_000.0,
-        current_price   = 150.0,
-        confidence      = 0.75,
-        signal          = {'target_price': 165.0, 'stop_loss': 142.5}
-    )
-
-    quantity = result['quantity']         # shares to buy
-    value    = result['trade_value']      # $ amount
-    method   = result['method']           # 'fixed_fractional' or 'kelly'
-
-CONFIGURATION
--------------
-Set POSITION_SIZING_METHOD in trading_config.py:
-
-    POSITION_SIZING_METHOD = 'fixed_fractional'   # default
-    POSITION_SIZING_METHOD = 'kelly'               # experimental
-
-Limits (from risk_config.py):
-    MAX_POSITION_SIZE = 0.15   → cap at 15% of portfolio
-    MIN_POSITION_SIZE = 0.02   → floor at 2% of portfolio
+Author: Kawtar (Risk Manager)
 """
 
 from logger import get_logger, setup_logging
