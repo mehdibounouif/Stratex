@@ -39,6 +39,16 @@ class TradingConfig:
     # 0.5 = half-Kelly — cuts volatility significantly vs full Kelly.
     # Never go above 1.0 (full Kelly) unless you are very confident in your edge.
     KELLY_FRACTION = 0.5
+
+    # ── Live trading ──────────────────────────────────────────────
+    USE_PAPER_TRADING = True
+    ALPACA_ORDER_TYPE = 'market'
+
+    # ── Backtest fill simulation ──────────────────────────────────
+    BACKTEST_SLIPPAGE_MODEL = 'percentage'
+    BACKTEST_SLIPPAGE_VALUE = 0.001   # 10 basis points
+    BACKTEST_COMMISSION_MODEL = 'per_share'
+    BACKTEST_COMMISSION_RATE = 0.005  # $0.005 per share
     
     # TradingAgents
     USE_TRADING_AGENT = False
