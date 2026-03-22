@@ -1,28 +1,32 @@
-# Core dependencies
-pandas==2.1.4
-numpy==1.26.2
-python-dotenv==1.0.0
+#pandas==2.1.4
+#numpy==1.26.2
+#python-dotenv==1.0.0
+#yfinance==0.2.33
+#alpha-vantage==2.3.1
+#sqlalchemy==2.0.23
+#openai==1.6.1
+#schedule==1.2.0
+#requests==2.31.0
+#streamlit==1.29.0
+#plotly==5.18.0
+#matplotlib==3.8.2
+#pytest==7.4.3
+#pytest-cov==4.1.0
 
-# Data sources
-yfinance==0.2.33
-alpha-vantage==2.3.1
-
-# Database
-sqlalchemy==2.0.23
 
 
-# API/LLM
-openai==1.6.1
-
-# Utilities
-schedule==1.2.0
-requests==2.31.0
-
-# Visualization (for future dashboard)
-streamlit==1.29.0
-plotly==5.18.0
-matplotlib==3.8.2
-
-# Testing
-pytest==7.4.3
-pytest-cov==4.1.0
+pandas>=2.1.3
+numpy>=1.26.2
+python-dotenv>=1.0.0
+yfinance>=0.2.50
+requests>=2.31.0
+scipy>=1.11.4
+alpaca-trade-api>=3.2.0
+aiohttp>=3.11.0
+apscheduler>=3.10.4
+scikit-learn>=1.3.2
+streamlit>=1.29.0
+plotly>=6.6.0
+streamlit-autorefresh>=1.0.1
+pytz>=2023.3.post1
+websockets<11
