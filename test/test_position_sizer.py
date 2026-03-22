@@ -121,12 +121,12 @@ class TestFixedFractional:
     def test_size_never_exceeds_max_position(self, ff_sizer):
         """Even at 100% confidence, size is capped at MAX_POSITION_SIZE (15%)."""
         result = ff_sizer.calculate(20_000, 10.0, 1.0)  # cheap stock → lots of shares
-        assert result['size_pct'] <= ff_sizer.max_pct + 0.001  # small float tolerance
+        assert result['size_pct'] <= float(ff_sizer.max_pct) + 0.001  # FIX: float() wrap avoids Decimal + float TypeError
 
     def test_size_never_below_min_position(self, ff_sizer):
         """Even at minimum confidence, size is floored at MIN_POSITION_SIZE (2%)."""
         result = ff_sizer.calculate(20_000, 50.0, 0.55)
-        assert result['size_pct'] >= ff_sizer.min_pct - 0.001
+        assert result['size_pct'] >= float(ff_sizer.min_pct) - 0.001  # FIX: float() wrap avoids Decimal - float TypeError
 
     def test_trade_value_equals_quantity_times_price(self, ff_sizer):
         result = ff_sizer.calculate(20_000, 150.0, 0.75)
@@ -158,7 +158,7 @@ class TestKellyCriterion:
         """High confidence + favorable odds should not exceed MAX_POSITION_SIZE."""
         result = kelly_sizer.calculate(20_000, 50.0, 0.99,
                                         signal={'target_price': 100.0, 'stop_loss': 45.0})
-        assert result['size_pct'] <= kelly_sizer.max_pct + 0.001
+        assert result['size_pct'] <= float(kelly_sizer.max_pct) + 0.001  # FIX: float() wrap avoids Decimal + float TypeError
 
     def test_kelly_negative_fraction_floors_to_min(self, kelly_sizer):
         """Very low confidence can produce negative Kelly → should floor to min."""
@@ -167,7 +167,7 @@ class TestKellyCriterion:
         # Quantity may be 0 if even min_pct can't afford 1 share — that's acceptable.
         # But if it returns shares, size_pct must be >= min_pct.
         if result['quantity'] > 0:
-            assert result['size_pct'] >= kelly_sizer.min_pct - 0.001
+            assert result['size_pct'] >= float(kelly_sizer.min_pct) - 0.001  # FIX: float() wrap avoids Decimal - float TypeError
 
 
 # ─────────────────────────────────────────────────────────────
