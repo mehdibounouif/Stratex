@@ -1,0 +1,169 @@
+fixed fractionnal size 
+
+What this “metric” actually does
+
+This function answers ONE question:
+
+👉 “How big should my trade be?”
+
+And it uses:
+
+your confidence (how sure you are)
+your risk limits (min % and max %)
+
+Core idea (super simple)
+
+Think of it like this:
+
+Confidence	Trade size
+Low (barely good signal)	Small position
+Medium	                    Normal position
+High (very strong signal)	Bigger position
+
+First: Forget code. Think like this.
+
+You have 2 things:
+
+1) Confidence (input)
+
+A number between:
+
+0.0 → 1.0
+2) Position size (output)
+
+A SAFE range:
+
+4% → 7%
+🎯 Your goal
+
+👉 Convert this:
+
+confidence → position size
+
+BUT safely.
+
+🔥 The core problem
+
+If you used confidence directly:
+
+confidence = 0.75 → invest 75% ❌ (VERY dangerous)
+
+So instead, you say:
+
+👉 “No matter what, I only invest between 4% and 7%”
+
+🧩 So what do we do?
+
+We map one range into another
+
+confidence:   0.5 --------→ 1.0
+                becomes
+position:     4%  --------→ 7%
+
+This is the ENTIRE idea.
+
+⚙️ Now we go step by step (VERY detailed)
+
+We’ll use ONE example the whole time:
+
+confidence = 0.75
+min_conf   = 0.5
+min_pct    = 0.04
+max_pct    = 0.07
+🔹 STEP 1: Ignore low confidence
+conf_above_min = confidence - min_conf
+
+👉 Why?
+
+Because below min_conf, you don’t trust signals.
+
+Example:
+0.75 - 0.50 = 0.25
+
+👉 This means:
+
+Your confidence is 0.25 ABOVE the minimum threshold
+Important:
+
+If confidence is LOW:
+
+0.40 - 0.50 = -0.10
+
+That makes no sense for scaling.
+
+So we fix it:
+
+conf_above_min = max(0, ...)
+
+👉 Now:
+
+= 0
+🔹 STEP 2: Understand the TOTAL range
+conf_range = 1.0 - min_conf
+
+Example:
+
+1.0 - 0.5 = 0.5
+
+👉 This means:
+
+The usable confidence space is 0.5 wide
+🔹 STEP 3: Convert to a ratio (THIS IS THE KEY STEP)
+ratio = conf_above_min / conf_range
+
+Example:
+
+ratio = 0.25 / 0.5 = 0.5
+🧠 What does "ratio = 0.5" mean?
+
+👉 It means:
+
+Your confidence is 50% of the usable range
+Think of it like a progress bar:
+min_conf (0.5)         max (1.0)
+     |-------------------|
+          ↑
+       you are here (0.75)
+
+→ halfway → 50%
+🔹 STEP 4: Translate that into money size
+
+Now we apply the SAME logic to position size.
+
+First: size range
+scale_range = max_pct - min_pct
+0.07 - 0.04 = 0.03
+
+👉 You have:
+
+3% room to scale
+Now apply the ratio
+raw_scale = ratio * scale_range
+0.5 * 0.03 = 0.015
+
+👉 That means:
+
+You should move 1.5% above the minimum
+🔹 STEP 5: Add the base (VERY important)
+scaled_pct = min_pct + raw_scale
+0.04 + 0.015 = 0.055
+
+👉 Final:
+
+5.5%
+🔥 WHY we add min_pct
+
+Because:
+
+👉 Even weak signals still get minimum allocation
+
+You're scaling on top of a base, not from zero.
+
+🔹 STEP 6: Clamp (safety net)
+size_pct = max(min_pct, min(max_pct, scaled_pct))
+🧠 Why this exists
+
+To enforce:
+
+size NEVER < 4%
+size NEVER > 7%

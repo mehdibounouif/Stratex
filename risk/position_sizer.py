@@ -42,12 +42,9 @@ Author: Kawtar (Risk Manager)
 """
 
 from logger import get_logger
+from decimal import Decimal, InvalidOperation
 
 log = get_logger('risk.position_sizer')
-
-
-
-
 
 
 class PositionSizer:
@@ -90,39 +87,72 @@ class PositionSizer:
         • Select the sizing algorithm
         • Prepare internal parameters required for sizing
         """
-
+        #iport inside init to avoid loop calling
         from config.trading_config import TradingConfig
         from config.risk_config import RiskConfig
 
-        self.tconfig = TradingConfig()
-        self.rconfig = RiskConfig()
+        try:
+            self.tconfig = TradingConfig()
+            self.rconfig = RiskConfig()
+        except Exception as e:
+            log.error(f"PositionSizer: config load failed: {e}")
+            raise
 
-        # Method: explicit arg > config value > hardcoded default
+        #if no method was passed initially it tries to get the method from the tconf esle default
         self.method = (
             method
             or getattr(self.tconfig, 'POSITION_SIZING_METHOD', 'fixed_fractional')
         )
 
-        # Fixed fractional parameters
-        self.base_pct   = getattr(self.tconfig, 'POSITION_SIZE_PCT', 0.05)
-        self.min_pct    = self.rconfig.MIN_POSITION_SIZE        # 0.02
-        self.max_pct    = self.rconfig.MAX_POSITION_SIZE        # 0.15
-        self.min_conf   = getattr(self.tconfig, 'MIN_SIGNAL_CONFIDENCE', 0.55)
+        VALID_METHODS = {'fixed_fractional', 'kelly'}
+        if self.method not in VALID_METHODS:
+            raise ValueError(
+                f"Unknown sizing method '{self.method}'. "
+                f"Must be one of {VALID_METHODS}"
+            )
 
-        # Kelly parameters
-        self.kelly_fraction = getattr(self.tconfig, 'KELLY_FRACTION', 0.5)
-        self.target_pct     = getattr(self.rconfig, 'DEFAULT_TAKE_PROFIT_PCT', 0.10)
-        self.stop_pct       = getattr(self.rconfig, 'DEFAULT_STOP_LOSS_PCT',   0.05)
+        try:
+            # how max / min trade can take from the portfolio based on configs + default confid
+            self.base_pct       = Decimal(str(getattr(self.tconfig, 'POSITION_SIZE_PCT',       0.05)))
+            self.min_pct        = Decimal(str(getattr(self.rconfig, 'MIN_POSITION_SIZE',       0.02)))
+            self.max_pct        = Decimal(str(getattr(self.rconfig, 'MAX_POSITION_SIZE',       0.15)))
+            self.min_conf       = Decimal(str(getattr(self.tconfig, 'MIN_SIGNAL_CONFIDENCE',   0.55)))
+            # Kelly parameters
+            # assume we gain 10% on a winning trade
+            # assume we lose 5% on a losing trade
+            self.kelly_fraction = Decimal(str(getattr(self.tconfig, 'KELLY_FRACTION',          0.5)))
+            self.target_pct     = Decimal(str(getattr(self.rconfig, 'DEFAULT_TAKE_PROFIT_PCT', 0.10)))
+            self.stop_pct       = Decimal(str(getattr(self.rconfig, 'DEFAULT_STOP_LOSS_PCT',   0.05)))
+        except InvalidOperation as e:
+            raise ValueError(
+                f"PositionSizer: invalid config value cannot be converted to Decimal: {e}"
+            ) from e
+
+        if not (0 < self.min_pct < self.max_pct <= 1):
+            raise ValueError(
+                f"Invalid position size bounds: "
+                f"min={self.min_pct}, max={self.max_pct}"
+            )
+
+        if not (0 < self.stop_pct < self.target_pct <= 1):
+            raise ValueError(
+                f"Invalid Kelly bounds: "
+                f"stop={self.stop_pct}, target={self.target_pct}"
+            )
+
+        if not (0 < self.kelly_fraction <= 1):
+            raise ValueError(
+                f"kelly_fraction must be between 0 and 1, "
+                f"got {self.kelly_fraction}"
+            )
 
         log.debug(
-            f"PositionSizer: method={self.method}, "
+            f"PositionSizer ready — "
+            f"method={self.method}, "
             f"base={self.base_pct:.0%}, "
-            f"range=[{self.min_pct:.0%}, {self.max_pct:.0%}]"
+            f"range=[{self.min_pct:.0%}, {self.max_pct:.0%}], "
+            f"kelly_fraction={self.kelly_fraction}"
         )
-
-
-
-        pass
 
 
     # ─────────────────────────────────────────────
@@ -132,9 +162,9 @@ class PositionSizer:
     def calculate(
         self,
         portfolio_value: float,
-        current_price: float,
-        confidence: float,
-        signal: dict = None
+        current_price:   float,
+        confidence:      float,
+        signal:          dict = None
     ) -> dict:
         """
         Calculate the appropriate position size for a trade.
@@ -208,108 +238,184 @@ class PositionSizer:
             Explanation of calculation for logging/debugging.
         """
 
-        pass
+        try:
+            portfolio_value = Decimal(str(portfolio_value))
+            current_price   = Decimal(str(current_price))
+            confidence      = Decimal(str(confidence))
+        except InvalidOperation as e:
+            return self._zero_result(
+                f"Could not convert inputs to Decimal: {e}"
+            )
+
+        if portfolio_value <= Decimal('0.0'):
+            return self._zero_result(
+                f"Invalid portfolio value: {portfolio_value}"
+            )
+
+        if current_price <= Decimal('0.0'):
+            return self._zero_result(
+                f"Invalid current price: {current_price}"
+            )
+
+        if not (Decimal('0.0') <= confidence <= Decimal('1.0')):
+            return self._zero_result(
+                f"Invalid confidence: {confidence}. Must be between 0.0 and 1.0"
+            )
+
+        try:
+            if self.method == 'kelly':
+                size_pct, reasoning = self._kelly_size(confidence, signal)
+            else:
+                size_pct, reasoning = self._fixed_fractional_size(confidence)
+        except ValueError as e:
+            return self._zero_result(
+                f"Sizing algorithm failed: {e}"
+            )
+
+        # clamp to risk limits
+        size_pct = max(self.min_pct, min(self.max_pct, size_pct))
+
+        trade_value = portfolio_value * size_pct
+
+        quantity = int(trade_value // current_price)
+
+        if quantity < 1:
+            return self._zero_result(
+                f"Position too small: "
+                f"trade_value={trade_value} "
+                f"< current_price={current_price}"
+            )
+
+        actual_trade_value = Decimal(str(quantity)) * current_price
+        actual_size_pct    = actual_trade_value / portfolio_value
+
+        log.info(
+            f"calculate: "
+            f"method={self.method}, "
+            f"portfolio={portfolio_value}, "
+            f"price={current_price}, "
+            f"confidence={confidence}, "
+            f"size_pct={size_pct}, "
+            f"quantity={quantity}, "
+            f"actual_trade_value={actual_trade_value}, "
+            f"actual_size_pct={actual_size_pct}"
+        )
+
+        return {
+            "quantity":    quantity,
+            "trade_value": float(actual_trade_value),
+            "size_pct":    float(actual_size_pct),
+            "method":      self.method,
+            "reasoning":   reasoning,
+        }
 
 
     # ─────────────────────────────────────────────
     # SIZING ALGORITHMS
     # ─────────────────────────────────────────────
 
-    def _fixed_fractional_size(self, confidence: float) -> tuple:
+    def _fixed_fractional_size(self, confidence: Decimal) -> tuple:
         """
-        Fixed Fractional Position Sizing.
-
-        This method allocates a base percentage of the portfolio
-        to each trade and scales that percentage based on signal
-        confidence.
-
-        Concept
-        -------
-
-        Higher confidence signals receive slightly larger
-        position sizes.
-
-        Lower confidence signals receive smaller allocations.
-
-        Example
-        -------
-
-        Base size = 5%
-
-        Confidence scaling:
-
-            confidence = 0.55 → ~4%
-            confidence = 0.75 → ~5%
-            confidence = 0.95 → ~7%
-
-        Returns
-        -------
-
-        tuple:
-
-            size_pct
-                Target portfolio percentage.
-
-            reasoning
-                Explanation string for logging.
+        This function decides how much of my portfolio to use for a trade 
+        based on my confidence. First, it looks at the minimum and maximum limits
+        for confidence and trade size. Then it calculates how far my confidence 
+        is above the minimum (conf_above_min) and how big the "trusted confidence zone"
+        is (conf_range). Next, it finds the ratio of how far I am inside that zone
+        — 0 means just at the minimum, 1 means maximum confidence.
+        That ratio is multiplied by the scale_range (the difference between min and max trade size) 
+        to get the raw_scale, which is the extra trade size to add on top of the minimum.
+        Finally, the function adds the minimum trade size to the raw_scale,
+        giving a scaled_pct, and ensures the result never goes below the minimum
+        or above the maximum. This gives a safe, confidence-based trade size 
+        — small for weak signals, bigger for strong signals, but always within the limits.
+        Ex : How far is my confidence between 0.5 
+        and 1.0? → apply that same % between 4% and 7%
         """
 
-        pass
+        #Compute usable confidence range ---
+        #i only trust signals above min condidence
+        #conf_range = the width of the valid confidence zone
+        conf_range = Decimal('1.0') - self.min_conf
+        if conf_range <= Decimal('0.0'):
+            raise ValueError(
+                f"min_conf={self.min_conf} leaves no room for scaling. "
+                f"Must be less than 1.0"
+            )
+
+        # Compute position size range ---
+        # scale_range = the space available to increase your trade size
+        scale_range = self.max_pct - self.min_pct
+        if scale_range <= Decimal('0.0'):
+            raise ValueError(
+                f"max_pct={self.max_pct} must be greater than "
+                f"min_pct={self.min_pct}"
+            )
+
+        # How much higher is my confidence than the minimum
+        conf_above_min = max(Decimal('0.0'), confidence - self.min_conf)
+
+        # how far you are from the minimum confidence
+        ratio      = conf_above_min / conf_range
+        # How much extra trade size we should add on top of the minimum
+        raw_scale  = ratio * scale_range
+        #Add minimum position size ---
+        scaled_pct = self.min_pct + raw_scale
+
+        # clamp to risk limits as a final safety net
+        # min(max_pct, scaled_pct) → prevents going above max
+        # max(min_pct, ...)        → prevents going below min
+        size_pct = max(self.min_pct, min(self.max_pct, scaled_pct))
+
+        reasoning = (
+            f"Fixed fractional: "
+            f"confidence={confidence}, "
+            f"min_conf={self.min_conf}, "
+            f"conf_above_min={conf_above_min}, "
+            f"conf_range={conf_range}, "
+            f"ratio={ratio}, "
+            f"scale_range={scale_range}, "
+            f"raw_scale={raw_scale}, "
+            f"scaled_pct={scaled_pct}, "
+            f"final_size={size_pct}"
+        )
+
+        log.debug(reasoning)
+
+        return size_pct, reasoning
 
 
-    def _kelly_size(self, confidence: float, signal: dict = None) -> tuple:
+    def _kelly_size(self, confidence: Decimal, signal: dict = None) -> tuple:
         """
-        Kelly Criterion Position Sizing.
+        This function calculates how much of my portfolio to risk on a trade 
+        using the Kelly Criterion, which aims to maximize long-term growth 
+        based on my chance of winning and the reward/risk ratio.
 
-        This method determines position size using the Kelly formula,
-        which maximizes long-term capital growth based on statistical
-        edge.
+        First, it calculates the potential gain (win_pct) and potential loss 
+        (loss_pct) as percentages of my risk/reward. Then, it computes the 
+        win/loss ratio b, which tells me how much I gain for every $1 I risk.
 
-        Kelly Formula
-        -------------
+        Using the Kelly formula:
 
-            f* = (p × b − q) / b
+            full_kelly = (p * b - q) / b
 
-        where
+        where p = confidence (chance of winning) and q = 1 - p (chance of losing),
+        it calculates the fraction of my portfolio to risk for maximum growth. 
+        To reduce risk, it multiplies full_kelly by a fractional multiplier 
+        (kelly_fraction).
 
-            p = probability of winning
-            q = probability of losing
-            b = win/loss ratio
-
-
-        Inputs
-        ------
-
-        probability of winning (p)
-
-            Derived from the strategy confidence score.
-
-        win/loss ratio (b)
-
-            Derived from:
-
-                target_price
-                stop_loss
-
-            If those values are unavailable, the system falls back
-            to default risk/reward ratios defined in RiskConfig.
-
-
-        Risk Adjustment
-        ---------------
-
-        Because full Kelly is extremely aggressive, implementations
-        typically apply a fractional multiplier:
-
-            fractional_kelly = full_kelly × KELLY_FRACTION
+        Finally, it clamps the resulting size_pct to ensure it never goes below 
+        the minimum or above the maximum allowed percentage. This gives a 
+        safe, statistically-driven trade size — small for weak signals, larger 
+        for strong signals, but always within limits.
 
         Example:
 
-            full Kelly = 12%
-            KELLY_FRACTION = 0.5
-
-            final size = 6%
-
+            confidence = 0.6
+            win_pct = 20%, loss_pct = 10%
+            b = 2
+            full_kelly = 40%
+            kelly_fraction = 0.5
+            final_size = 20% of portfolio to risk
 
         Returns
         -------
@@ -317,13 +423,99 @@ class PositionSizer:
         tuple:
 
             size_pct
-                Target portfolio percentage.
+                Target portfolio percentage as Decimal.
 
-            reasoning
-                Explanation string describing the calculation.
-        """
+                """
+        if confidence < self.min_conf:
+            raise ValueError(
+                f"confidence={confidence} is below min_conf={self.min_conf}. "
+                f"Kelly requires a minimum confidence threshold."
+            )
 
-        pass
+        signal = signal or {}
+
+        current_price = signal.get("current_price")
+        target_price  = signal.get("target_price")
+        stop_loss     = signal.get("stop_loss")
+
+        has_all = all([current_price, target_price, stop_loss])
+        has_any = any([current_price, target_price, stop_loss])
+
+        if has_any and not has_all:
+            log.warning(
+                f"_kelly_size: signal has partial prices "
+                f"(current={current_price}, target={target_price}, stop={stop_loss}). "
+                f"Falling back to config defaults."
+            )
+
+        if has_all:
+            try:
+                current_price = Decimal(str(current_price))
+                target_price  = Decimal(str(target_price))
+                stop_loss     = Decimal(str(stop_loss))
+            except InvalidOperation as e:
+                raise ValueError(
+                    f"Could not convert signal prices to Decimal: {e}"
+                )
+
+            if current_price <= Decimal('0.0'):
+                raise ValueError(
+                    f"current_price={current_price} must be greater than 0"
+                )
+            if stop_loss >= current_price:
+                raise ValueError(
+                    f"stop_loss={stop_loss} must be less than "
+                    f"current_price={current_price}"
+                )
+            if target_price <= current_price:
+                raise ValueError(
+                    f"target_price={target_price} must be greater than "
+                    f"current_price={current_price}"
+                )
+
+            win_pct      = (target_price - current_price) / current_price
+            loss_pct     = (current_price - stop_loss)    / current_price
+            price_source = "signal"
+
+        else:
+            win_pct      = self.target_pct
+            loss_pct     = self.stop_pct
+            price_source = "config defaults"
+
+        if loss_pct <= Decimal('0.0'):
+            raise ValueError(
+                f"loss_pct={loss_pct} must be greater than 0"
+            )
+
+        # win/loss ratio: for every $1 risked, how much do we gain on a win
+        b = win_pct / loss_pct
+
+        # kelly formula: f* = (p x b - q) / b
+        # my chance of winning
+        p = confidence
+        q = Decimal('1.0') - p
+
+        full_kelly = max(Decimal('0.0'), (p * b - q) / b)
+
+        size_pct = full_kelly * self.kelly_fraction
+        size_pct = max(self.min_pct, min(self.max_pct, size_pct))
+
+        reasoning = (
+            f"Kelly ({price_source}): "
+            f"confidence={confidence}, "
+            f"p={p}, "
+            f"q={q}, "
+            f"win_pct={win_pct}, "
+            f"loss_pct={loss_pct}, "
+            f"b={b}, "
+            f"full_kelly={full_kelly}, "
+            f"kelly_fraction={self.kelly_fraction}, "
+            f"final_size={size_pct}"
+        )
+
+        log.debug(reasoning)
+
+        return size_pct, reasoning
 
 
     # ─────────────────────────────────────────────
@@ -350,5 +542,10 @@ class PositionSizer:
 
         dict with zero position values and explanation.
         """
-
-        pass
+        return {
+            "quantity":    0,
+            "trade_value": 0.0,
+            "size_pct":    0.0,
+            "method":      "none",
+            "reasoning":   reason,
+        }
