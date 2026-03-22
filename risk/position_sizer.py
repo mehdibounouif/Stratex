@@ -338,6 +338,9 @@ class PositionSizer:
             confidence = 0.75 → ~5%
             confidence = 0.95 → ~7%
 
+        idea: How far is my confidence between 0.5 
+        and 1.0? → apply that same % between 4% and 7%
+
         Returns
         -------
 
@@ -358,14 +361,17 @@ class PositionSizer:
             raise ValueError(
                 f"Could not convert config values to Decimal: {e}"
             )
-
+        #Compute usable confidence range ---
+        #i only trust signals above min condidence
+        #conf_range = the width of the valid confidence zone
         conf_range = Decimal('1.0') - min_conf
         if conf_range <= Decimal('0.0'):
             raise ValueError(
                 f"min_conf={min_conf} leaves no room for scaling. "
                 f"Must be less than 1.0"
             )
-
+        # Compute position size range ---
+        # scale_range = the space available to increase your trade size
         scale_range = max_pct - min_pct
 
         if scale_range <= Decimal('0.0'):
@@ -373,17 +379,19 @@ class PositionSizer:
                 f"max_pct={max_pct} must be greater than "
                 f"min_pct={min_pct}"
             )
-
-        # how far above the minimum is this confidence score
-        # max(0) protects against tiny negatives from floating point noise
+        # How much higher is my confidence than the minimum
         conf_above_min = max(Decimal('0.0'), confidence - min_conf)
 
-        # map confidence range onto position size range
+        # how far you are from the minimum confidence
         ratio      = conf_above_min / conf_range
+        # How much extra trade size we should add on top of the minimum
         raw_scale  = ratio * scale_range
+        #Add minimum position size ---
         scaled_pct = min_pct + raw_scale
 
         # clamp to risk limits as a final safety net
+        # min(max_pct, scaled_pct) → prevents going above max
+        # max(min_pct, ...)        → prevents going below min
         size_pct = max(min_pct, min(max_pct, scaled_pct))
 
         reasoning = (
