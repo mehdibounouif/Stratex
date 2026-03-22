@@ -12,9 +12,8 @@ import json
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from logger import setup_logging, get_logger
+from logger import get_logger
 
-setup_logging()
 logger = get_logger('data.news_fetcher')
 
 

@@ -40,9 +40,8 @@ Author: Kawtar (Risk Manager)
 import json
 import os
 from datetime import datetime
-from logger import get_logger, setup_logging
+from logger import get_logger
 
-setup_logging()
 log = get_logger('risk.trade_audit')
 
 

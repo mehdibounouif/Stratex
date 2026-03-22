@@ -60,9 +60,8 @@ import os
 import sys
 import sqlite3
 from datetime import datetime
-from logger import get_logger, setup_logging
+from logger import get_logger
 
-setup_logging()
 log = get_logger('data.health_check')
 
 

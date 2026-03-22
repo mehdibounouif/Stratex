@@ -41,9 +41,8 @@ Half-Kelly with our caps never exceeds MAX_POSITION_SIZE (15%).
 Author: Kawtar (Risk Manager)
 """
 
-from logger import get_logger, setup_logging
+from logger import get_logger
 
-setup_logging()
 log = get_logger('risk.position_sizer')
 
 

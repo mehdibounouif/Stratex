@@ -38,9 +38,8 @@ from risk.risk_manager import risk_manager
 from risk.position_sizer import PositionSizer
 from risk.trade_audit import trade_audit
 from system.signal_aggregator import SignalAggregator
-from logger import setup_logging, get_logger
+from logger import  get_logger
 
-setup_logging()
 log = get_logger('system.system_architect')
 
 

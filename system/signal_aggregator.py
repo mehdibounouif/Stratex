@@ -8,9 +8,8 @@ with intelligent conflict resolution and confidence scoring.
 Author: Mehdi
 """
 
-from logger import get_logger, setup_logging
+from logger import get_logger
 
-setup_logging()
 log = get_logger('system.signal_aggregator')
 
 

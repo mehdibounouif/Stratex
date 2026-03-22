@@ -50,9 +50,8 @@ retries and hammering the API at the same moment (thundering herd problem).
 import time
 import random
 import functools
-from logger import get_logger, setup_logging
+from logger import get_logger
 
-setup_logging()
 log = get_logger('data.retry')
 
 

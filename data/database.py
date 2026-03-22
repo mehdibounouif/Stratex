@@ -18,9 +18,8 @@ import sqlite3
 from datetime import datetime, timedelta
 from config import BaseConfig
 import pandas as pd
-from logger import get_logger, setup_logging
+from logger import get_logger
 
-setup_logging()
 logging = get_logger('data.database')
 class Database:
     

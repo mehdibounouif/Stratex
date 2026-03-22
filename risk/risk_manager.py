@@ -13,9 +13,8 @@ Author: Kawtar (Risk Manager)
 """
 
 from config import RiskConfig, TradingConfig
-from logger import get_logger, setup_logging
+from logger import get_logger
 
-setup_logging()
 log = get_logger("risk.risk_manager")
 
 

@@ -19,12 +19,10 @@ import numpy as np
 from decimal import Decimal
 from datetime import datetime, timedelta
 from collections import defaultdict
-from logger import setup_logging, get_logger
+from logger import  get_logger
 import yfinance as yf
 import math
 
-
-setup_logging()
 logger = get_logger('risk.portfolio.portfolio_calculator')
 
 class PortfolioCalculator:

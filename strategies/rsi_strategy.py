@@ -4,10 +4,9 @@ from datetime import datetime
 from data.data_engineer import data_access
 import json
 import os
-from logger import setup_logging, get_logger
+from logger import get_logger
 from strategies.base_strategy import BaseStrategy
 
-setup_logging()
 logging = get_logger("strategies.rsi_strategy")
 
 class RSIStrategy(BaseStrategy):

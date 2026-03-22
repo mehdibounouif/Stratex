@@ -38,7 +38,7 @@ from config.base_config import BaseConfig
 from config.trading_config import TradingConfig
 from datetime import datetime, timezone
 import os
-from logger import setup_logging, get_logger
+from logger import get_logger
 from decimal import Decimal, ROUND_HALF_UP
 from dataclasses import dataclass
 from typing import Dict, List, Optional
@@ -112,7 +112,6 @@ class Position:
             entry_date=self.entry_date
         )
 
-setup_logging()
 log = get_logger('risk.portfolio.portfolio_tracker')
 
 # ══════════════════════════════════════════════════════════════

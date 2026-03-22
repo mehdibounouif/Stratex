@@ -32,10 +32,10 @@ Author: Abdilah (Data Engineer)
 
 import pandas as pd
 from datetime import datetime, timedelta
-from logger import setup_logging, get_logger
+from logger import get_logger
 from data.database import Database
 
-setup_logging()
+
 log = get_logger("data.data_engineer")
 
 

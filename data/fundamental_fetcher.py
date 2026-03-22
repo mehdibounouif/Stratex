@@ -13,9 +13,8 @@ import json
 import time
 from datetime import datetime
 from pathlib import Path
-from logger import setup_logging, get_logger
+from logger import get_logger
 
-setup_logging()
 logger = get_logger('data.fundamental_fetcher')
 
 

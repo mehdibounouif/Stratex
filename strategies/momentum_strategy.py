@@ -14,10 +14,9 @@ import pandas as pd
 from decimal import Decimal
 import numpy as np
 from datetime import datetime
-from logger import get_logger, setup_logging
+from logger import get_logger
 from strategies.base_strategy import BaseStrategy
 
-setup_logging()
 log = get_logger('strategies.momentum_strategy')
 
 
