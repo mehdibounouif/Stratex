@@ -345,7 +345,7 @@ class RiskManager:
 
         except Exception as e:
             log.warning(f"Daily loss check failed ({e}), allowing trade")
-            return True, "Daily loss check skipped"
+            return False, "Daily loss check skipped"
 
     def _check_drawdown(self):
         """
@@ -364,7 +364,7 @@ class RiskManager:
 
         except Exception as e:
             log.warning(f"Drawdown check failed ({e}), allowing trade")
-            return True, "Drawdown check skipped"
+            return False, "Drawdown check skipped"
 
     def _check_position_exists(self, ticker):
         """For SELL orders: verify we actually own this ticker."""
