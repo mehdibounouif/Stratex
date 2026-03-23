@@ -400,7 +400,7 @@ class TestDrawdownCircuitBreaker:
         ):
             ok, msg = fresh_rm._check_drawdown()
 
-        assert ok is True
+        assert ok is False
         assert "skipped" in msg.lower()
 
 
