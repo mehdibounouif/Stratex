@@ -321,98 +321,70 @@ class PortfolioCalculator:
         self.sector_map[ticker] = "Other"
         return "Other"
 
+
     def _load_sector_map(self):
         """
-        Static sector map for the trading watchlist.
-
-        Bypasses live yfinance.Ticker().info calls inside the risk gate
-        (which block for 1-3s and fail under rate limiting).
-
-        Keys match RiskConfig.MAX_SECTOR_EXPOSURE exactly (lowercase).
-        Extend this map when adding new tickers to the watchlist.
+        Load sector classification mapping.
+        
+        Returns
+        -------
+        dict
+            {ticker: sector}
+        
+        Description
+        -----------
+        - Provides sector lookup table
+        - Can be replaced by API or database source
         """
-        return {
+        logger.info("Loading sector classification map (GICS standard).")
+
+        sector_map = {
             # Information Technology
-            'AAPL':  'information technology',
-            'MSFT':  'information technology',
-            'NVDA':  'information technology',
-            'AMD':   'information technology',
-            # Communication Services
-            'GOOGL': 'communication services',
-            'META':  'communication services',
-            'NFLX':  'communication services',
+            "AAPL":  "Information Technology",
+            "MSFT":  "Information Technology",
+            "GOOGL": "Communication Services",
+            "NVDA":  "Information Technology",
+
+            # Financials
+            "JPM": "Financials",
+            "BAC": "Financials",
+            "GS":  "Financials",
+
+            # Health Care
+            "JNJ": "Health Care",
+            "PFE": "Health Care",
+            "MRK": "Health Care",
+
             # Consumer Discretionary
-            'TSLA':  'consumer discretionary',
-            'AMZN':  'consumer discretionary',
-            # Market proxy (used for beta calculation)
-            'SPY':   'other',
+            "AMZN": "Consumer Discretionary",
+            "TSLA": "Consumer Discretionary",
+            "HD":   "Consumer Discretionary",
+
+            # Consumer Staples
+            "PG":  "Consumer Staples",
+            "KO":  "Consumer Staples",
+            "PEP": "Consumer Staples",
+
+            # Energy
+            "XOM": "Energy",
+            "CVX": "Energy",
+
+            # Industrials
+            "BA":  "Industrials",
+            "CAT": "Industrials",
+
+            # Materials
+            "LIN": "Materials",
+            "APD": "Materials",
+
+            # Utilities
+            "NEE": "Utilities",
+            "DUK": "Utilities",
+
+            # Real Estate
+            "AMT": "Real Estate",
+            "PLD": "Real Estate",
         }
-
-
-
-#    def _load_sector_map(self):
-#        """
-#        Load sector classification mapping.
-#        
-#        Returns
-#        -------
-#        dict
-#            {ticker: sector}
-#        
-#        Description
-#        -----------
-#        - Provides sector lookup table
-#        - Can be replaced by API or database source
-#        """
-#        logger.info("Loading sector classification map (GICS standard).")
-#
-#        sector_map = {
-#            # Information Technology
-#            "AAPL":  "Information Technology",
-#            "MSFT":  "Information Technology",
-#            "GOOGL": "Communication Services",
-#            "NVDA":  "Information Technology",
-#
-#            # Financials
-#            "JPM": "Financials",
-#            "BAC": "Financials",
-#            "GS":  "Financials",
-#
-#            # Health Care
-#            "JNJ": "Health Care",
-#            "PFE": "Health Care",
-#            "MRK": "Health Care",
-#
-#            # Consumer Discretionary
-#            "AMZN": "Consumer Discretionary",
-#            "TSLA": "Consumer Discretionary",
-#            "HD":   "Consumer Discretionary",
-#
-#            # Consumer Staples
-#            "PG":  "Consumer Staples",
-#            "KO":  "Consumer Staples",
-#            "PEP": "Consumer Staples",
-#
-#            # Energy
-#            "XOM": "Energy",
-#            "CVX": "Energy",
-#
-#            # Industrials
-#            "BA":  "Industrials",
-#            "CAT": "Industrials",
-#
-#            # Materials
-#            "LIN": "Materials",
-#            "APD": "Materials",
-#
-#            # Utilities
-#            "NEE": "Utilities",
-#            "DUK": "Utilities",
-#
-#            # Real Estate
-#            "AMT": "Real Estate",
-#            "PLD": "Real Estate",
-#        }
 
         logger.info(f"Loaded sector map with {len(sector_map)} tickers.")
         return sector_map

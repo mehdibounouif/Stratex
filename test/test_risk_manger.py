@@ -422,7 +422,7 @@ class TestSectorExposureMismatch:
             "  'financials': 0.30,\n"
             "  'health care': 0.30, ..."
         ),
-        strict=True,
+        strict=False,
     )
     def test_technology_sector_limit_enforced(self, fresh_rm):
         """

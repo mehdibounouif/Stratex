@@ -14,6 +14,7 @@ Author: Kawtar (Risk Manager)
 
 from config import RiskConfig, TradingConfig
 from logger import get_logger
+from decimal import Decimal
 
 log = get_logger("risk.risk_manager")
 
@@ -292,7 +293,7 @@ class RiskManager:
 
             current_pct  = current_sectors_lower.get(sector, 0.0)
             new_trade_pct = trade_value / self.portfolio_value if self.portfolio_value > 0 else 0
-            new_pct       = current_pct + new_trade_pct
+            new_pct = current_pct + Decimal(str(new_trade_pct))
 
             # Look up the limit for this sector (fall back to 'other')
             limit = self.config.MAX_SECTOR_EXPOSURE.get(
