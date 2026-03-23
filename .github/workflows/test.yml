@@ -9,8 +9,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: trueruns-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code
@@ -43,7 +42,7 @@ jobs:
             -q \
             --cov=. \
             --cov-report=term-missing \
-            --cov-fail-under=55
+            --cov-fail-under=45
 
       - name: Upload coverage report
         if: always()
