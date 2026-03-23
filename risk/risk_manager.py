@@ -294,7 +294,7 @@ class RiskManager:
 
         except Exception as e:
             log.warning(f"Sector check failed ({e}), allowing trade")
-            return True, "Sector check skipped (no data)"
+            return False, "Sector check skipped (no data)"
 
     def _check_daily_loss(self):
         """
