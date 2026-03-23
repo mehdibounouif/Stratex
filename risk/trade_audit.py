@@ -30,6 +30,8 @@ Every call to record() writes a dict with these fields:
     strategy        str    e.g. 'RSI Mean Reversion'
     sizing_method   str    'fixed_fractional' | 'kelly' | 'none'
     size_pct        float  fraction of portfolio
+    entry_price     float  original entry price (non-zero for STOPPED_OUT records)
+    risk_approved   bool   whether the risk manager approved the trade
     risk_checks     dict   {check_name: bool} — which checks passed/failed
     reject_reason   str    why trade was rejected (empty string if executed)
     reasoning       str    strategy reasoning text
@@ -39,7 +41,8 @@ Author: Kawtar (Risk Manager)
 
 import json
 import os
-from datetime import datetime
+import threading
+from datetime import datetime, timezone
 from logger import get_logger, setup_logging
 
 setup_logging()
@@ -47,28 +50,7 @@ log = get_logger('risk.trade_audit')
 
 
 class TradeAudit:
-    """
-    Interface for the trade auditing system.
-
-    This class is responsible for recording every trading decision
-    made by the system.
-
-    Each decision is serialized into a JSON object and appended
-    to a persistent log file.
-
-    The audit system allows developers and analysts to inspect
-    historical decisions, analyze performance, and debug issues.
-    """
-
     def __init__(self, log_path: str = "logs/trade_audit.jsonl"):
-        self.log_path = log_path
-        os.makedirs(os.path.dirname(log_path), exist_ok=True)
-        # Touch the file so it always exists from startup,
-        # even before the first trade decision is recorded.
-        if not os.path.isfile(log_path):
-            open(log_path, 'a').close()
-        log.debug(f"TradeAudit initialized: {log_path}")
- 
         """
         Initialize the trade auditing system.
 
@@ -82,6 +64,43 @@ class TradeAudit:
 
                 logs/trade_audit.jsonl
         """
+
+        #check if the path have a value and the value is a string
+        if not log_path or not isinstance(log_path, str):
+            raise ValueError(
+                f"TradeAudit: log_path must be a non-empty string, "
+                f"got {type(log_path).__name__!r}: {log_path!r}"
+            )
+
+        #checks the extention of the file it must end with .jsonl
+        if not log_path.endswith('.jsonl'):
+            raise ValueError(
+                f"TradeAudit: log_path must end with '.jsonl', "
+                f"got {log_path!r}"
+            )
+        #assiging the passed param path to local object path
+        self.log_path = log_path
+
+        try:
+            os.makedirs(os.path.dirname(os.path.abspath(log_path)), exist_ok=True)
+        except OSError as exc:
+            raise OSError(
+                f"TradeAudit: could not create log directory for "
+                f"{log_path!r}: {exc}"
+            ) from exc
+
+        try:
+            if not os.path.isfile(log_path):
+                open(log_path, 'a').close()
+        except OSError as exc:
+            raise OSError(
+                f"TradeAudit: could not create audit file "
+                f"{log_path!r}: {exc}"
+            ) from exc
+        self._lock = threading.Lock()
+
+        log.debug(f"TradeAudit initialized: {log_path}")
+
 
     # ─────────────────────────────────────────────
     # PUBLIC API
@@ -99,103 +118,87 @@ class TradeAudit:
         sizing: dict = None,
         realized_pnl: float = 0.0
     ) -> None:
-        """
-        Record a trade decision in the audit log.
 
-        This method writes one structured record describing the
-        outcome of a trading decision.
+        # check if the ticker exists and it's a string 
+        if not ticker or not isinstance(ticker, str):
+            raise ValueError(
+                f"record: ticker must be a non-empty string, "
+                f"got {type(ticker).__name__!r}: {ticker!r}"
+            )
+        VALID_OUTCOMES = {"EXECUTED", "REJECTED", "HELD", "STOPPED_OUT"}
+        if outcome not in VALID_OUTCOMES:
+            raise ValueError(
+                f"record: unknown outcome {outcome!r}. "
+                f"Must be one of {VALID_OUTCOMES}"
+            )
 
-        Parameters
-        ----------
+        # actions baynin
+        VALID_ACTIONS = {"BUY", "SELL", "HOLD"}
+        if action not in VALID_ACTIONS:
+            raise ValueError(
+                f"record: unknown action {action!r}. "
+                f"Must be one of {VALID_ACTIONS}"
+            )
 
-        ticker : str
-            Asset symbol (example: "AAPL").
+        if not isinstance(quantity, int) or quantity < 0:
+            raise ValueError(
+                f"record: quantity must be a non-negative integer, "
+                f"got {type(quantity).__name__!r}: {quantity!r}"
+            )
 
-        outcome : str
-            Final decision result.
+        if not isinstance(price, (int, float)) or price < 0:
+            raise ValueError(
+                f"record: price must be a non-negative number, "
+                f"got {type(price).__name__!r}: {price!r}"
+            )
 
-            Allowed values include:
+        if not isinstance(realized_pnl, (int, float)):
+            raise ValueError(
+                f"record: realized_pnl must be a number, "
+                f"got {type(realized_pnl).__name__!r}: {realized_pnl!r}"
+            )
 
-                EXECUTED
-                REJECTED
-                HELD
-                STOPPED_OUT
+        signal   = dict(signal)   if isinstance(signal,   dict) else {}
+        approval = dict(approval) if isinstance(approval, dict) else {}
+        sizing   = dict(sizing)   if isinstance(sizing,   dict) else {} 
 
-        action : str
-            Intended trade action.
+        confidence = signal.get("confidence", 0.0)
+        if not isinstance(confidence, (int, float)) or not (0.0 <= confidence <= 1.0):
+            log.warning(
+                f"record: confidence value {confidence!r} is outside "
+                f"expected range [0.0, 1.0] for ticker={ticker}"
+            )
+            confidence = max(0.0, min(1.0, float(confidence))) if isinstance(confidence, (int, float)) else 0.0
 
-            Possible values:
+        entry = {
+            "timestamp":     datetime.now(timezone.utc).isoformat(),
+            "ticker":        ticker.strip().upper(),
+            "outcome":       outcome,
+            "action":        action,
+            "quantity":      quantity,
+            "price":         price,
+            "trade_value":   round(quantity * price, 4),
+            "realized_pnl":  realized_pnl,
+            "confidence":    confidence,
+            "signal_type":   str(signal.get("signal_type", "")),
+            "strategy":      str(signal.get("strategy",    "")),
+            "reasoning":     str(signal.get("reasoning",   "")),
+            "entry_price":   float(signal.get("entry_price", 0.0)),
+            "sizing_method": str(sizing.get("method",      "none")),
+            "size_pct":      float(sizing.get("size_pct",  0.0)),
+            "risk_approved": bool(approval.get("approved", False)),
+            "risk_checks":   approval.get("checks",        {}),
+            "reject_reason": str(approval.get("reject_reason") or approval.get("reason") or ""),
+        }
+        self._append(entry)
 
-                BUY
-                SELL
-                HOLD
-
-        quantity : int
-            Number of shares traded.
-
-            For rejected or held trades this may be zero.
-
-        price : float
-            Execution price for the trade.
-
-        signal : dict, optional
-            Signal data produced by the strategy.
-
-            May include:
-
-                confidence
-                signal_type
-                strategy name
-                reasoning text
-
-        approval : dict, optional
-            Risk manager approval result.
-
-            May include:
-
-                approval status
-                risk checks
-                rejection reason
-
-        sizing : dict, optional
-            Position sizing result produced by the PositionSizer.
-
-            May include:
-
-                sizing method
-                position percentage
-
-        realized_pnl : float
-            Profit or loss realized by the trade.
-
-            Typically non-zero for SELL trades closing positions.
-
-
-        Behavior
-        --------
-
-        The implementation should:
-
-        1) Construct a structured audit record
-
-        2) Include metadata such as timestamps
-
-        3) Include strategy reasoning and signal confidence
-
-        4) Append the record to the JSONL audit file
-
-        5) Optionally emit a human-readable log line
-
-
-        Result
-        ------
-
-        No return value.
-
-        The audit record is persisted to disk.
-        """
-
-        pass
+        log.info(
+            f"[AUDIT] {outcome:12s} | {ticker:6s} | {action:4s}"
+            f" | qty={quantity:6d} | px={price:.2f}"
+            f" | pnl={realized_pnl:+.2f}"
+            f" | conf={confidence:.2f}"
+            f" | {entry['signal_type']}"
+        )
 
 
     def record_stop_loss(
@@ -207,85 +210,94 @@ class TradeAudit:
         realized_pnl: float,
         reason: str
     ) -> None:
-        """
-        Record a forced exit event such as a stop-loss or take-profit.
+        if not ticker or not isinstance(ticker, str):
+            raise ValueError(
+                f"record_stop_loss: ticker must be a non-empty string, "
+                f"got {type(ticker).__name__!r}: {ticker!r}"
+            )
 
-        Stop-loss events are triggered automatically by the risk
-        management system and therefore bypass normal strategy logic.
+        for name, val in [("entry_price", entry_price), ("exit_price", exit_price)]:
+            if not isinstance(val, (int, float)) or val <= 0:
+                raise ValueError(
+                    f"record_stop_loss: {name} must be a positive number, "
+                    f"got {type(val).__name__!r}: {val!r}"
+                )
+        
+        if not isinstance(quantity, int) or quantity < 0:
+            raise ValueError(
+                f"record_stop_loss: quantity must be a non-negative integer, "
+                f"got {type(quantity).__name__!r}: {quantity!r}"
+            )
+        if not isinstance(realized_pnl, (int, float)):
+            raise ValueError(
+                f"record_stop_loss: realized_pnl must be a number, "
+                f"got {type(realized_pnl).__name__!r}: {realized_pnl!r}"
+            )
 
-        Parameters
-        ----------
+        if not reason or not isinstance(reason, str):
+            raise ValueError(
+                f"record_stop_loss: reason must be a non-empty string, "
+                f"got {type(reason).__name__!r}: {reason!r}"
+            )
 
-        ticker : str
-            Asset symbol.
-
-        entry_price : float
-            Price at which the position was originally opened.
-
-        exit_price : float
-            Price at which the position was closed.
-
-        quantity : int
-            Number of shares closed.
-
-        realized_pnl : float
-            Profit or loss realized when closing the position.
-
-        reason : str
-            Human-readable explanation of why the stop was triggered.
-
-            Examples:
-
-                "Stop loss triggered"
-                "Trailing stop hit"
-                "Take profit reached"
-
-
-        Behavior
-        --------
-
-        The implementation should write a record with outcome:
-
-            STOPPED_OUT
-
-        This record indicates that the exit was enforced
-        by the risk management system rather than a strategy signal.
-        """
-
-        pass
+        self.record(
+            ticker=ticker,
+            outcome="STOPPED_OUT",
+            action="SELL",
+            quantity=quantity,
+            price=exit_price,
+            signal={
+                "confidence":  0.0,
+                "signal_type": "STOP_LOSS",
+                "strategy":    "Risk Management",
+                "entry_price": entry_price,
+                "reasoning":   (
+                    f"{reason} | "
+                    f"entry={entry_price:.2f} "
+                    f"exit={exit_price:.2f} "
+                    f"pnl={realized_pnl:+.2f}"
+                ),
+            },
+            realized_pnl=realized_pnl,
+        )
 
 
     def tail(self, n: int = 20) -> list:
-        """
-        Retrieve the most recent audit records.
+        if not isinstance(n, int) or n <= 0:
+            raise ValueError(
+                f"tail: n must be a positive integer, "
+                f"got {type(n).__name__!r}: {n!r}"
+            )
+        MAX_TAIL = 10_000
+        if n > MAX_TAIL:
+            log.warning(
+                f"tail: n={n} exceeds maximum allowed ({MAX_TAIL}), "
+                f"clamping to {MAX_TAIL}"
+            )
+            n = MAX_TAIL
 
-        This method allows developers or monitoring tools to inspect
-        the latest trading decisions without reading the entire log.
+        if not os.path.isfile(self.log_path):
+            log.warning(f"tail: log file not found at {self.log_path!r}")
+            return []
+        lines = []
+        try:
+            with open(self.log_path, 'r', encoding='utf-8') as fh:
+                lines = fh.readlines()
+        except OSError as exc:
+            log.error(f"tail: could not read log file: {exc}")
+            return []
 
-        Parameters
-        ----------
+        records = []
+        for line in lines[-n:]:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError as exc:
+                log.warning(f"tail: skipping malformed line: {exc} | line={line[:80]!r}")
 
-        n : int
-            Number of recent records to return.
-
-        Returns
-        -------
-
-        list of dict
-
-            A list containing the last N audit records
-            in chronological order.
-
-
-        Typical Uses
-        ------------
-
-        • debugging recent trades
-        • monitoring system activity
-        • testing and validation
-        """
-
-        pass
+        return records
 
 
     def summary(self) -> dict:
@@ -334,32 +346,210 @@ class TradeAudit:
             Aggregated statistics summarizing system behavior.
         """
 
-        pass
+        # PROTECTION 1 — handle missing log file gracefully
+        # the file may not exist yet on a fresh deployment
+        # returning empty summary is more useful than crashing
+        if not os.path.isfile(self.log_path):
+            log.warning(f"summary: log file not found at {self.log_path!r}")
+            return self._empty_summary()
 
+        # PROTECTION 2 — guard the file read
+        # permissions denied or disk error must not crash the system
+        records = []
+        try:
+            with open(self.log_path, 'r', encoding='utf-8') as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    # PROTECTION 3 — skip malformed lines without aborting
+                    # one corrupt record must not wipe out the entire summary
+                    try:
+                        records.append(json.loads(line))
+                    except json.JSONDecodeError as exc:
+                        log.warning(
+                            f"summary: skipping malformed line: {exc} | "
+                            f"line={line[:80]!r}"
+                        )
+        except OSError as exc:
+            log.error(f"summary: could not read log file: {exc}")
+            return self._empty_summary()
 
-    # ─────────────────────────────────────────────
-    # INTERNAL OPERATIONS
-    # ─────────────────────────────────────────────
+        # PROTECTION 4 — handle empty file gracefully
+        # file exists but has no valid records yet
+        if not records:
+            return self._empty_summary()
+
+        # filter records by outcome and action
+        executed = [r for r in records  if r.get("outcome") == "EXECUTED"]
+        rejected = [r for r in records  if r.get("outcome") == "REJECTED"]
+        stopped  = [r for r in records  if r.get("outcome") == "STOPPED_OUT"]
+        buys     = [r for r in executed if r.get("action")  == "BUY"]
+        sells    = [r for r in executed if r.get("action")  == "SELL"]
+
+        # ── PnL aggregation ──────────────────────────────────────
+        # PROTECTION 5 — guard each pnl value individually
+        # a single non-numeric field must not corrupt the entire sum
+        total_pnl    = 0.0
+        pnl_count    = 0
+        winning_count = 0
+
+        for r in sells:
+            raw = r.get("realized_pnl")
+            # PROTECTION 6 — skip missing pnl fields
+            if raw is None:
+                log.warning(
+                    f"summary: missing realized_pnl in record "
+                    f"ticker={r.get('ticker', 'UNKNOWN')} "
+                    f"timestamp={r.get('timestamp', 'UNKNOWN')}"
+                )
+                continue
+            # PROTECTION 7 — skip non-numeric pnl values
+            if not isinstance(raw, (int, float)):
+                log.warning(
+                    f"summary: non-numeric realized_pnl {raw!r} in record "
+                    f"ticker={r.get('ticker', 'UNKNOWN')} "
+                    f"timestamp={r.get('timestamp', 'UNKNOWN')}"
+                )
+                continue
+            total_pnl += raw
+            pnl_count += 1
+            if raw > 0:
+                winning_count += 1
+
+        total_pnl = round(total_pnl, 4)
+
+        # PROTECTION 8 — guard division by zero on win rate
+        # no sells yet means win rate is not calculable
+        if pnl_count > 0:
+            win_rate = round(winning_count / pnl_count * 100, 2)
+        else:
+            win_rate = 0.0
+
+        # ── Confidence aggregation ───────────────────────────────
+        # PROTECTION 9 — guard each confidence value individually
+        # only average over executed trades — rejected/held didn't commit capital
+        confidence_sum   = 0.0
+        confidence_count = 0
+
+        for r in executed:
+            raw = r.get("confidence")
+            # PROTECTION 10 — skip missing confidence fields
+            if raw is None:
+                log.warning(
+                    f"summary: missing confidence in record "
+                    f"ticker={r.get('ticker', 'UNKNOWN')} "
+                    f"timestamp={r.get('timestamp', 'UNKNOWN')}"
+                )
+                continue
+            # PROTECTION 11 — skip non-numeric confidence values
+            if not isinstance(raw, (int, float)):
+                log.warning(
+                    f"summary: non-numeric confidence {raw!r} in record "
+                    f"ticker={r.get('ticker', 'UNKNOWN')} "
+                    f"timestamp={r.get('timestamp', 'UNKNOWN')}"
+                )
+                continue
+            confidence_sum   += raw
+            confidence_count += 1
+
+        # PROTECTION 12 — guard division by zero on average confidence
+        # no executed trades yet means confidence is not calculable
+        if confidence_count > 0:
+            avg_confidence = round(confidence_sum / confidence_count, 4)
+        else:
+            avg_confidence = 0.0
+
+        return {
+            "total_decisions":    len(records),
+            "executed":           len(executed),
+            "rejected":           len(rejected),
+            "stopped_out":        len(stopped),
+            "buys":               len(buys),
+            "sells":              len(sells),
+            "total_realized_pnl": total_pnl,
+            "win_rate":           win_rate,
+            "avg_confidence":     avg_confidence,
+        }
+
+        # ─────────────────────────────────────────────
+        # INTERNAL OPERATIONS
+        # ─────────────────────────────────────────────
 
     def _append(self, entry: dict) -> None:
-        """
-        Append a single audit record to the log file.
+        if not self.log_path or not isinstance(self.log_path, str):
+            log.error("_append: log_path is not set or invalid, skipping write")
+            return
 
-        This method performs the low-level file write operation.
+        if not isinstance(entry, dict) or not entry:
+            log.error("_append: called with invalid entry, skipping")
+            return
 
-        Implementation requirements:
+        expected_types = {
+            "timestamp":    str,
+            "ticker":       str,
+            "outcome":      str,
+            "action":       str,
+            "quantity":     int,
+            "price":        (int, float),
+            "trade_value":  (int, float),
+            "realized_pnl": (int, float),
+            "confidence":   (int, float),
+            "size_pct":     (int, float),
+        }
+        for field, expected in expected_types.items():
+            val = entry.get(field)
+            if val is not None and not isinstance(val, expected):
+                log.warning(
+                    f"_append: field '{field}' has unexpected type "
+                    f"{type(val).__name__}, expected {expected} | "
+                    f"ticker={entry.get('ticker', 'UNKNOWN')}"
+                )
 
-        • serialize the record as JSON
-        • append it as a single line to the JSONL file
-        • ensure the write is atomic
-        • handle file system errors gracefully
+        
+        try:
+            line = json.dumps(entry, default=str) + "\n"
+        except (TypeError, ValueError) as exc:
+            log.error(
+                f"_append: failed to serialize entry for "
+                f"{entry.get('ticker', 'UNKNOWN')}: {exc}"
+            )
+            return
 
-        This method is considered internal and should not
-        be called directly by external components.
-        """
+        try:
+            with self._lock:
+                with open(self.log_path, 'a', buffering=1, encoding='utf-8') as fh:
+                    fh.write(line)
+                    fh.flush()
+                    os.fsync(fh.fileno())
+        except OSError as exc:
+            # catch filesystem errors without crashing
+            # a failed audit write must never stop a trade from executing
+            # inner try/except handles the case where the logger itself
+            # fails (e.g. disk full) and would raise a second exception
+            try:
+                log.error(
+                    f"_append: failed to write audit record for "
+                    f"{entry.get('ticker', 'UNKNOWN')}: {exc} | "
+                    f"entry={line.strip()}"
+                )
+            except Exception:
+                pass  # logger itself failed — nothing left to do, must not crash
 
-        pass
+
+    def _empty_summary(self) -> dict:
+        """Return a zeroed summary dict used when no records exist."""
+        return {
+            "total_decisions":    0,
+            "executed":           0,
+            "rejected":           0,
+            "stopped_out":        0,
+            "buys":               0,
+            "sells":              0,
+            "total_realized_pnl": 0.0,
+            "win_rate":           0.0,
+            "avg_confidence":     0.0,
+        }
 
 
-# ── Module-level singleton ────────────────────────────────────────
 trade_audit = TradeAudit()
