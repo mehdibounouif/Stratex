@@ -171,6 +171,20 @@ class RiskManager:
             log.info(f"   {'✅' if ok else '❌'} Max drawdown:    {msg}")
             if not ok and first_failure is None:
                 first_failure = msg
+            
+            # 7. Correlation check
+            ok, msg = self._check_correlation(ticker)
+            checks['correlation'] = ok
+            log.info(f"   {'✅' if ok else '❌'} Correlation:     {msg}")
+            if not ok and first_failure is None:
+                first_failure = msg
+
+            # 8. Portfolio beta check
+            ok, msg = self._check_beta()
+            checks['portfolio_beta'] = ok
+            log.info(f"   {'✅' if ok else '❌'} Portfolio beta:  {msg}")
+            if not ok and first_failure is None:
+                first_failure = msg
 
         elif action == 'SELL':
             # SELL checks: verify we actually own this stock
@@ -374,6 +388,111 @@ class RiskManager:
         if ticker not in owned:
             return False, f"No position in {ticker} to sell (owned: {owned})"
         return True, f"{ticker} position exists  ✓"
+    
+    def _check_correlation(self, ticker):
+        """
+        New position must not be highly correlated with existing holdings.
+        Uses 60-day return correlation via data_access cache. Skips if fewer than 2 positions.
+        """
+        try:
+            import pandas as pd
+            from data.data_engineer import data_access
+
+            existing = [p.ticker for p in self.tracker.positions]
+            if len(existing) < 2:
+                return True, "Fewer than 2 positions — correlation check skipped"
+
+            limit = self.config.MAX_CORRELATION  # 0.80
+
+            new_df = data_access.get_price_history(ticker, days=60)
+            if new_df is None or new_df.empty:
+                return False, f"Correlation check failed — no price data for {ticker}"
+
+            close_col = 'Close' if 'Close' in new_df.columns else 'close'
+            new_returns = new_df[close_col].pct_change(fill_method=None).dropna()
+
+            for existing_ticker in existing:
+                ex_df = data_access.get_price_history(existing_ticker, days=60)
+                if ex_df is None or ex_df.empty:
+                    continue
+
+                ex_returns = ex_df[close_col].pct_change(fill_method=None).dropna()
+
+                # Align on common dates
+                aligned = pd.concat([new_returns, ex_returns], axis=1).dropna()
+                if len(aligned) < 10:
+                    continue
+
+                corr = aligned.iloc[:, 0].corr(aligned.iloc[:, 1])
+                if corr > limit:
+                    return False, (
+                        f"{ticker} is {corr:.2f} correlated with {existing_ticker} "
+                        f"— exceeds {limit:.0%} limit"
+                    )
+
+            return True, f"{ticker} correlation within limits ✓"
+
+        except Exception as e:
+            log.warning(f"Correlation check failed ({e}), blocking trade")
+            return False, f"Correlation check error: {e}"
+
+    def _check_beta(self):
+        """
+        Portfolio weighted beta must not exceed MAX_PORTFOLIO_BETA (1.5).
+        Uses 60-day returns vs SPY as market proxy via data_access cache.
+        """
+        try:
+            import pandas as pd
+            from data.data_engineer import data_access
+
+            positions = self.tracker.positions
+            if not positions:
+                return True, "No positions — beta check skipped"
+
+            portfolio_value = self.portfolio_value
+            if portfolio_value <= 0:
+                return True, "Portfolio value zero — beta check skipped"
+
+            spy_df = data_access.get_price_history('SPY', days=60)
+            if spy_df is None or spy_df.empty:
+                return False, "Beta check failed — no SPY data returned"
+
+            close_col = 'Close' if 'Close' in spy_df.columns else 'close'
+            spy_returns = spy_df[close_col].pct_change(fill_method=None).dropna()
+            spy_var = spy_returns.var()
+
+            if spy_var == 0:
+                return True, "SPY variance zero — beta check skipped"
+
+            limit = self.config.MAX_PORTFOLIO_BETA  # 1.5
+            weighted_beta = 0.0
+
+            for position in positions:
+                pos_df = data_access.get_price_history(position.ticker, days=60)
+                if pos_df is None or pos_df.empty:
+                    continue
+
+                pos_returns = pos_df[close_col].pct_change(fill_method=None).dropna()
+
+                # Align on common dates
+                aligned = pd.concat([pos_returns, spy_returns], axis=1).dropna()
+                if len(aligned) < 10:
+                    continue
+
+                beta   = aligned.iloc[:, 0].cov(aligned.iloc[:, 1]) / spy_var
+                weight = (float(position.quantity * position.current_price)
+                          / portfolio_value)
+                weighted_beta += weight * beta
+
+            if weighted_beta > limit:
+                return False, (
+                    f"Portfolio beta {weighted_beta:.2f} exceeds {limit:.1f} limit"
+                )
+            return True, f"Portfolio beta {weighted_beta:.2f} ≤ {limit:.1f} ✓"
+
+        except Exception as e:
+            log.warning(f"Beta check failed ({e}), blocking trade")
+            return False, f"Beta check error: {e}"
 
 
 # ── Global instance ────────────────────────────────────────────
