@@ -170,6 +170,16 @@ class DataEngineer:
             )
             
             if df is not None and not df.empty:
+                # Quality-gate: validate before returning to strategies
+                if self.cleaner:
+                    report = self.cleaner.validate_stock_data(df, ticker=ticker)
+                    score  = report.get('data_quality_score', 100.0)
+                    issues = report.get('issues', [])
+                    if issues:
+                        log.warning(f"⚠️  [{ticker}] Data quality {score}/100 — {'; '.join(issues)}")
+                    if score < 50.0:
+                        log.error(f"❌ [{ticker}] Data quality too low ({score}/100) — rejected")
+                        return None
                 log.info(f"✅ Retrieved {len(df)} records for {ticker}")
                 return df
             else:
@@ -296,7 +306,6 @@ class DataEngineer:
         This is called when cache is bypassed or stale.
         """
         df = self.stock_fetcher.fetch_stock_prices(ticker, start_date, end_date)
-        print(len(df))
         if df is not None and not df.empty and self.cleaner:
             df = self.cleaner.clean_stock_prices(df, ticker=ticker)
         
@@ -525,7 +534,6 @@ if __name__ == "__main__":
     if df is not None:
         log.info(f"✅ Retrieved {len(df)} records")
         log.info(f"\nSample data (last 5 days):")
-        print(df.tail())
     else:
         log.error("❌ Failed to get data")
     
