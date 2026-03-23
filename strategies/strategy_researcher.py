@@ -17,7 +17,7 @@ class StrategyResearcher:
             'rsi_mean_reversion':  rsi_strategy,
             'momentum':            momentum_strategy,
             'mean_reversion':      mean_reversion_strategy,
-            'pairs':               pairs_strategy,
+            #'pairs':               pairs_strategy,
             #'ml_signal':           ml_signal_strategy,
         }
         self.default_strategy = TradingConfig.DEFAULT_STRATEGY

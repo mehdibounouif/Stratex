@@ -301,6 +301,7 @@ class PortfolioCalculator:
 
             # Fall back to direct yfinance if data_access didn't provide sector
             if not info.get('sector'):
+                logger.info("sector not found in map sectors, try yf...\n")
                 stock  = yf.Ticker(ticker)
                 info   = stock.info or {}
 
