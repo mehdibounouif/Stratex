@@ -27,22 +27,23 @@ class RSIStrategy(BaseStrategy):
 
     def calculate_rsi(self, prices, period=14):
         """
-        Calculate RSI indicator
-        
-        Args:
-            prices: Series of closing prices
-            period: RSI period (default: 14)
-        
-        Returns:
-            Series of RSI values
+        RSI using Wilder's smoothing (EWM with com=period-1).
+        Matches Bloomberg, TradingView, and industry-standard RSI values.
+        SMA-based RSI (rolling mean) produces systematically different values
+        and miscalibrates the 25/75 entry thresholds.
         """
         delta = prices.diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-        
-        rs = gain / loss
+        gain  = delta.clip(lower=0)
+        loss  = -delta.clip(upper=0)
+
+        avg_gain = gain.ewm(com=period - 1, min_periods=period,
+                            adjust=False).mean()
+        avg_loss = loss.ewm(com=period - 1, min_periods=period,
+                            adjust=False).mean()
+
+        rs  = avg_gain / avg_loss
         rsi = 100 - (100 / (1 + rs))
-        
+
         return rsi
 
 

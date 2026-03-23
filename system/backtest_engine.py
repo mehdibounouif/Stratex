@@ -128,14 +128,21 @@ class BacktestEngine:
             summary = self.tracker.get_portfolio_summary()
             self.daily_values.append(float(summary['portfolio_value']))
             
-            # Check strategy
-            historical_data = df.iloc[:i+1]
+           # Generate signal from data UP TO but NOT INCLUDING current bar
+            # (we only know close[i] after the bar closes — fill next bar's open)
+            if i < 1:
+                continue  # need at least 1 prior bar to generate a signal
+
+            historical_data = df.iloc[:i]  # everything before current bar
             signal = self._get_signal(ticker, historical_data)
-            
+
+            # Fill at current bar's OPEN (the earliest realistic execution price)
+            open_col = 'Open' if 'Open' in df.columns else 'open'
+            fill_price = float(df.iloc[i][open_col])
+
             # Execute
             if signal['action'] != 'HOLD':
-                self._execute_signal(ticker, signal, current_price, date, position_size, historical_data)
-        
+                self._execute_signal(ticker, signal, fill_price, date, position_size, historical_data) 
         # Calculate metrics
         metrics = self._calculate_metrics()
         
