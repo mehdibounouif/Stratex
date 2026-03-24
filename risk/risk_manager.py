@@ -291,7 +291,7 @@ class RiskManager:
             # Convert keys to lowercase for matching
             current_sectors_lower = {k.lower(): v for k, v in current_sectors.items()}
 
-            current_pct  = current_sectors_lower.get(sector, 0.0)
+            current_pct  = current_sectors_lower.get(sector, Decimal('0'))
             new_trade_pct = trade_value / self.portfolio_value if self.portfolio_value > 0 else 0
             new_pct = current_pct + Decimal(str(new_trade_pct))
 
