@@ -108,3 +108,11 @@ class RiskConfig:
     # Locks in gains and avoids greed-driven losses
     DEFAULT_TAKE_PROFIT_PCT = 0.10  # 10% profit target
 
+    # Defines what happens when a risk check cannot complete due to data errors.
+    # True  = fail open  (allow trade, log warning)  — for opportunity filters
+    # False = fail closed (block trade, log error)   — for capital protection checks
+    SECTOR_CHECK_FAIL_OPEN      = True
+    CORRELATION_CHECK_FAIL_OPEN = True
+    BETA_CHECK_FAIL_OPEN        = True
+    DAILY_LOSS_CHECK_FAIL_OPEN  = False   # NEVER — this is a circuit breaker
+    DRAWDOWN_CHECK_FAIL_OPEN    = False   # NEVER — this is a circuit breaker

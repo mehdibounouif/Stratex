@@ -86,26 +86,40 @@ class AlpacaGateway:
             raise
 
     def get_order_status(self, order_id) -> str:
+        if not self.api:                          # ADD: null-guard (matches all other methods)
+            log.warning("get_order_status called but Alpaca API is not initialised.")
+            return "unknown"
         try:
             order = self.api.get_order(order_id)
             return order.status
         except Exception as e:
             log.error(f"Error getting order status {order_id}: {e}")
             return "unknown"
-
+    
+    
     def cancel_order(self, order_id) -> bool:
+        if not self.api:                          # ADD: null-guard
+            log.warning("cancel_order called but Alpaca API is not initialised.")
+            return False
         try:
             self.api.cancel_order(order_id)
+            log.info(f"Order {order_id} cancelled successfully.")
             return True
         except Exception as e:
             log.error(f"Error cancelling order {order_id}: {e}")
             return False
-
+    
+    
     def cancel_all_orders(self) -> int:
+        if not self.api:                          # ADD: null-guard (was already missing this too)
+            log.warning("cancel_all_orders called but Alpaca API is not initialised.")
+            return 0
         try:
             orders = self.api.list_orders(status='open')
+            count = len(orders)          # capture count BEFORE cancelling (fixes race condition R7)
             self.api.cancel_all_orders()
-            return len(orders)
+            log.info(f"Cancelled {count} open orders.")
+            return count
         except Exception as e:
             log.error(f"Error cancelling all orders: {e}")
             return 0
