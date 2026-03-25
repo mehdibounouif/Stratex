@@ -1,0 +1,215 @@
+aiohappyeyeballs==2.6.1
+    # via aiohttp
+aiohttp==3.13.3
+    # via
+    #   -r requirements.txt
+    #   alpaca-trade-api
+aiosignal==1.4.0
+    # via aiohttp
+alpaca-trade-api==3.2.0
+    # via -r requirements.txt
+altair==6.0.0
+    # via streamlit
+apscheduler==3.11.2
+    # via -r requirements.txt
+attrs==26.1.0
+    # via
+    #   aiohttp
+    #   jsonschema
+    #   referencing
+beautifulsoup4==4.14.3
+    # via yfinance
+blinker==1.9.0
+    # via streamlit
+build==1.4.1
+    # via pip-tools
+cachetools==7.0.5
+    # via streamlit
+certifi==2026.2.25
+    # via
+    #   curl-cffi
+    #   requests
+cffi==2.0.0
+    # via curl-cffi
+charset-normalizer==3.4.6
+    # via requests
+click==8.3.1
+    # via
+    #   pip-tools
+    #   streamlit
+curl-cffi==0.14.0
+    # via yfinance
+deprecation==2.1.0
+    # via alpaca-trade-api
+frozendict==2.4.7
+    # via yfinance
+frozenlist==1.8.0
+    # via
+    #   aiohttp
+    #   aiosignal
+gitdb==4.0.12
+    # via gitpython
+gitpython==3.1.46
+    # via streamlit
+idna==3.11
+    # via
+    #   requests
+    #   yarl
+jinja2==3.1.6
+    # via
+    #   altair
+    #   pydeck
+joblib==1.5.3
+    # via scikit-learn
+jsonschema==4.26.0
+    # via altair
+jsonschema-specifications==2025.9.1
+    # via jsonschema
+markupsafe==3.0.3
+    # via jinja2
+msgpack==1.0.3
+    # via alpaca-trade-api
+multidict==6.7.1
+    # via
+    #   aiohttp
+    #   yarl
+multitasking==0.0.12
+    # via yfinance
+narwhals==2.18.1
+    # via
+    #   altair
+    #   plotly
+numpy==2.4.3
+    # via
+    #   -r requirements.txt
+    #   alpaca-trade-api
+    #   pandas
+    #   pydeck
+    #   scikit-learn
+    #   scipy
+    #   streamlit
+    #   yfinance
+packaging==26.0
+    # via
+    #   altair
+    #   build
+    #   deprecation
+    #   plotly
+    #   streamlit
+    #   wheel
+pandas==2.3.3
+    # via
+    #   -r requirements.txt
+    #   alpaca-trade-api
+    #   streamlit
+    #   yfinance
+peewee==4.0.2
+    # via yfinance
+pillow==12.1.1
+    # via streamlit
+pip-tools==7.5.3
+    # via -r requirements.txt
+platformdirs==4.9.4
+    # via yfinance
+plotly==6.6.0
+    # via -r requirements.txt
+propcache==0.4.1
+    # via
+    #   aiohttp
+    #   yarl
+protobuf==6.33.6
+    # via streamlit
+pyarrow==23.0.1
+    # via streamlit
+pycparser==3.0
+    # via cffi
+pydeck==0.9.1
+    # via streamlit
+pyproject-hooks==1.2.0
+    # via
+    #   build
+    #   pip-tools
+python-dateutil==2.9.0.post0
+    # via pandas
+python-dotenv==1.2.2
+    # via -r requirements.txt
+pytz==2026.1.post1
+    # via
+    #   -r requirements.txt
+    #   pandas
+    #   yfinance
+pyyaml==6.0.1
+    # via alpaca-trade-api
+referencing==0.37.0
+    # via
+    #   jsonschema
+    #   jsonschema-specifications
+requests==2.32.5
+    # via
+    #   -r requirements.txt
+    #   alpaca-trade-api
+    #   streamlit
+    #   yfinance
+rpds-py==0.30.0
+    # via
+    #   jsonschema
+    #   referencing
+scikit-learn==1.8.0
+    # via -r requirements.txt
+scipy==1.17.1
+    # via
+    #   -r requirements.txt
+    #   scikit-learn
+six==1.17.0
+    # via python-dateutil
+smmap==5.0.3
+    # via gitdb
+soupsieve==2.8.3
+    # via beautifulsoup4
+streamlit==1.55.0
+    # via
+    #   -r requirements.txt
+    #   streamlit-autorefresh
+streamlit-autorefresh==1.0.1
+    # via -r requirements.txt
+tenacity==9.1.4
+    # via streamlit
+threadpoolctl==3.6.0
+    # via scikit-learn
+toml==0.10.2
+    # via streamlit
+tornado==6.5.5
+    # via streamlit
+typing-extensions==4.15.0
+    # via
+    #   aiosignal
+    #   altair
+    #   beautifulsoup4
+    #   referencing
+    #   streamlit
+tzdata==2025.3
+    # via pandas
+tzlocal==5.3.1
+    # via apscheduler
+urllib3==1.26.20
+    # via
+    #   alpaca-trade-api
+    #   requests
+watchdog==6.0.0
+    # via streamlit
+websocket-client==1.9.0
+    # via alpaca-trade-api
+websockets==10.4
+    # via
+    #   -r requirements.txt
+    #   alpaca-trade-api
+wheel==0.46.3
+    # via pip-tools
+yarl==1.23.0
+    # via aiohttp
+yfinance==0.2.58
+    # via -r requirements.txt
+
+# The following packages are considered to be unsafe in a requirements file:
+# pip
+# setuptools

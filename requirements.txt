@@ -30,3 +30,4 @@ plotly>=6.6.0
 streamlit-autorefresh>=1.0.1
 pytz>=2023.3.post1
 websockets<11
+pip-tools
