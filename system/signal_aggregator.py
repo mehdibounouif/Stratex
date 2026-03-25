@@ -146,17 +146,6 @@ class SignalAggregator:
         log.info(f"   📊 Both sources HOLD")
         return result
         
-        # ── CASE 4: Both HOLD ──────────────────────────────────
-        result = {
-            'action': 'HOLD',
-            'confidence': 30,
-            'reasoning': f"📊 Both {source1} and {source2} recommend HOLD",
-            'sources': [source1, source2],
-            'agreement': 'full'
-        }
-        
-        log.info(f"   📊 Both sources HOLD")
-        return result
     
     def combine_three(self, rsi_signal, momentum_signal, ai_signal=None):
         """
