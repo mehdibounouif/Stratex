@@ -43,9 +43,14 @@ class LiveEngine:
         except Exception as e:
             log.error(f"Error in pre_market_job: {e}", exc_info=True)
 
+
     def market_open_job(self):
         try:
             ts, om, cal, tracker, da = self._get_services()
+            from risk.risk_manager import risk_manager          # ADD
+            from risk.position_sizer import PositionSizer       # ADD
+            sizer = PositionSizer()                             # ADD
+    
             if not cal.is_trading_day(): return
             
             log.info("Market Open: Scanning watchlist...")
@@ -53,18 +58,44 @@ class LiveEngine:
             
             orders_submitted = 0
             for signal in signals:
-                if signal['action'] != 'HOLD' and signal['confidence'] >= TradingConfig.MIN_SIGNAL_CONFIDENCE:
-                    cash = float(tracker.get_portfolio_summary()['cash'])
-                    price = signal['current_price']
-                    if price > 0:
-                        quantity = int((cash * TradingConfig.POSITION_SIZE_PCT) / price)
-                        if quantity > 0:
-                            om.submit_from_signal(signal, quantity)
-                            orders_submitted += 1
+                if signal['action'] == 'HOLD':
+                    continue
+                if signal['confidence'] < TradingConfig.MIN_SIGNAL_CONFIDENCE:
+                    continue
+                
+                price = signal['current_price']
+                if price <= 0:
+                    continue
+                
+                # Size the trade
+                portfolio_val = float(tracker.get_portfolio_summary()['portfolio_value'])
+                quantity = sizer.calculate(signal, portfolio_val)   # or your sizing logic
+                if quantity <= 0:
+                    continue
+                
+                # ── RISK GATE (was missing entirely) ──────────────
+                trade = {
+                    'ticker':        signal['ticker'],
+                    'action':        signal['action'],
+                    'quantity':      quantity,
+                    'current_price': price,        # <-- correct key
+                    'confidence':    signal['confidence'],
+                    'reasoning':     signal.get('reasoning', ''),
+                }
+                result = risk_manager.approve_trade(trade)
+                if not result['approved']:
+                    log.warning(f"Risk rejected {signal['ticker']}: {result['reason']}")
+                    continue
+                # ────────────────────────────────────────────────────
+    
+                om.submit_from_signal(signal, quantity)
+                orders_submitted += 1
             
-            log.info(f"Submitted {orders_submitted} orders based on open signals.")
+            log.info(f"Submitted {orders_submitted} orders after risk screening.")
         except Exception as e:
             log.error(f"Error in market_open_job: {e}", exc_info=True)
+
+
 
     def mid_day_job(self):
         try:
