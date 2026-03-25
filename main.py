@@ -73,7 +73,7 @@ def main():
     parser = argparse.ArgumentParser(description="Quant_firm Trading")
     parser.add_argument('--live', action='store_true')
     parser.add_argument('--backtest', nargs=3, metavar=('TICKER', 'START', 'END'))
-#    parser.add_argument('--strategy', default=TradingConfig.DEFAULT_STRATEGY)
+    parser.add_argument('--strategy', default=TradingConfig.DEFAULT_STRATEGY)
 #    parser.add_argument('--dashboard', action='store_true')
     
     args = parser.parse_args()

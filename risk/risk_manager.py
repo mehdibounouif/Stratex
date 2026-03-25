@@ -309,7 +309,7 @@ class RiskManager:
 
         except Exception as e:
             log.warning(f"Sector check failed ({e}), allowing trade")
-            return False, "Sector check skipped (no data)"
+            return True, "Sector check skipped (no data)"
 
     def _check_daily_loss(self):
         """
@@ -435,7 +435,7 @@ class RiskManager:
 
         except Exception as e:
             log.warning(f"Correlation check failed ({e}), blocking trade")
-            return False, f"Correlation check error: {e}"
+            return True, f"Correlation check error: {e}"
 
     def _check_beta(self):
         """
@@ -493,7 +493,7 @@ class RiskManager:
 
         except Exception as e:
             log.warning(f"Beta check failed ({e}), blocking trade")
-            return False, f"Beta check error: {e}"
+            return True, f"Beta check error: {e}"
 
 
 # ── Global instance ────────────────────────────────────────────

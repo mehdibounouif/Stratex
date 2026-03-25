@@ -171,7 +171,7 @@ class BacktestEngine:
             if quantity <= 0: return
             
             # Risk check
-            trade_req = {'ticker': ticker, 'action': 'BUY', 'quantity': quantity, 'price': current_price}
+            trade_req = {'ticker': ticker, 'action': 'BUY', 'quantity': quantity, 'current_price': current_price}
             approval = self.risk.approve_trade(trade_req)
             if not approval.get('approved', False): return
             
