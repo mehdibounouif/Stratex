@@ -34,6 +34,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from logger import get_logger
 from data.database import Database
+import time
 
 
 log = get_logger("data.data_engineer")
@@ -287,7 +288,6 @@ class DataEngineer:
                 
                 # Rate limiting: 1 second delay between tickers
                 if i < len(tickers) - 1:  # Don't delay after last ticker
-                    import time
                     time.sleep(1)
                     
             except Exception as e:
@@ -483,6 +483,7 @@ class DataEngineer:
             Cache statistics: num_tickers, oldest_date, newest_date, total_records
         """
         try:
+            self.db.ensure_connected()
             cursor = self.db.cursor
             
             # Count tickers

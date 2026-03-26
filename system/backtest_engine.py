@@ -97,7 +97,13 @@ class BacktestEngine:
         
         try:
             # Get historical data
-            df = self.data_access.get_price_history(ticker, days=730)
+            # Calculate days needed from today back to start_date + 20% buffer
+            # for indicators that need warm-up data (e.g. 14-day RSI needs 14 prior bars)
+            from datetime import datetime
+            start_dt  = pd.to_datetime(start_date)
+            days_needed = (datetime.now() - start_dt).days
+            days_needed = int(days_needed * 1.20) + 30   # 20% buffer + 30 day indicator warm-up
+            df = self.data_access.get_price_history(ticker, days=days_needed)
             if df is None or df.empty:
                 log.error(f"❌ No data returned for {ticker}")
                 return {}
