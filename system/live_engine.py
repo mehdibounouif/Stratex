@@ -3,8 +3,6 @@ Scheduled live trading loop using APScheduler.
 Handles pre-market, open, mid-day, and close jobs with explicit NY timezone.
 """
 from datetime import datetime
-import json
-import os
 import pytz
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -13,134 +11,129 @@ from config.trading_config import TradingConfig
 
 log = get_logger('system.live_engine')
 
+
 class LiveEngine:
     def __init__(self):
-        # Explicitly define the New York Timezone
-        self.ny_tz = pytz.timezone('America/New_York')
+        self.ny_tz    = pytz.timezone('America/New_York')
         self.scheduler = BlockingScheduler(timezone=self.ny_tz)
 
     def _get_services(self):
-        from system.system_architect import trading_system
+        # ── Use get_trading_system() — NOT the module-level `trading_system`
+        # which is None by design until first call.
+        from system.system_architect import get_trading_system
         from execution.alpaca_gateway import order_manager
         from system.market_calendar import market_calendar
         from risk.portfolio.portfolio_tracker import position_tracker
         from data.data_engineer import data_access
-        return trading_system, order_manager, market_calendar, position_tracker, data_access
+        return get_trading_system(), order_manager, market_calendar, position_tracker, data_access
 
     def pre_market_job(self):
+        """Warm the data cache before the open."""
         try:
             ts, om, cal, tracker, da = self._get_services()
             if not cal.is_trading_day():
-                log.info("Skipping pre-market job: Not a trading day.")
+                log.info("Skipping pre-market job: not a trading day.")
                 return
-            
-            log.info("Running pre-market preparation...")
+
+            log.info("Pre-market: warming data cache...")
             for ticker in TradingConfig.DEFAULT_WATCHLIST:
-                da.get_price_history(ticker, days=365) # Ensure cache is warm
-            
+                da.get_price_history(ticker, days=365)
+
             summary = tracker.get_portfolio_summary()
-            log.info(f"Pre-market summary: Cash=${summary['cash']:,.2f}, Value=${summary['portfolio_value']:,.2f}")
+            log.info(
+                f"Pre-market summary: "
+                f"Cash=${float(summary['cash']):,.2f}, "
+                f"Value=${float(summary['portfolio_value']):,.2f}"
+            )
         except Exception as e:
             log.error(f"Error in pre_market_job: {e}", exc_info=True)
 
-
     def market_open_job(self):
+        """
+        Main daily trading job.
+        Delegates entirely to run_daily_analysis() which owns the correct sequence:
+            1. update_all_prices()
+            2. check_stop_losses()
+            3. scan_watchlist() → analyze → size → risk gate → execute → audit
+            4. save_daily_report()
+        """
         try:
             ts, om, cal, tracker, da = self._get_services()
-            from risk.risk_manager import risk_manager          # ADD
-            from risk.position_sizer import PositionSizer       # ADD
-            sizer = PositionSizer()                             # ADD
-    
-            if not cal.is_trading_day(): return
-            
-            log.info("Market Open: Scanning watchlist...")
-            signals = ts.scan_watchlist()
-            
-            orders_submitted = 0
-            for signal in signals:
-                if signal['action'] == 'HOLD':
-                    continue
-                if signal['confidence'] < TradingConfig.MIN_SIGNAL_CONFIDENCE:
-                    continue
-                
-                price = signal['current_price']
-                if price <= 0:
-                    continue
-                
-                # Size the trade
-                portfolio_val = float(tracker.get_portfolio_summary()['portfolio_value'])
-                quantity = sizer.calculate(signal, portfolio_val)   # or your sizing logic
-                if quantity <= 0:
-                    continue
-                
-                # ── RISK GATE (was missing entirely) ──────────────
-                trade = {
-                    'ticker':        signal['ticker'],
-                    'action':        signal['action'],
-                    'quantity':      quantity,
-                    'current_price': price,        # <-- correct key
-                    'confidence':    signal['confidence'],
-                    'reasoning':     signal.get('reasoning', ''),
-                }
-                result = risk_manager.approve_trade(trade)
-                if not result['approved']:
-                    log.warning(f"Risk rejected {signal['ticker']}: {result['reason']}")
-                    continue
-                # ────────────────────────────────────────────────────
-    
-                om.submit_from_signal(signal, quantity)
-                orders_submitted += 1
-            
-            log.info(f"Submitted {orders_submitted} orders after risk screening.")
+            if not cal.is_trading_day():
+                log.info("Skipping market_open_job: not a trading day.")
+                return
+
+            log.info("Market Open: starting daily analysis...")
+            results = ts.run_daily_analysis()
+
+            scan = results.get('scan', {})
+            log.info(
+                f"Market open complete — "
+                f"Bought: {scan.get('executed_buy', [])}, "
+                f"Sold: {scan.get('executed_sell', [])}, "
+                f"Rejected: {len(scan.get('rejected', []))}, "
+                f"Portfolio: ${scan.get('summary', {}).get('portfolio_value', 0):,.2f}"
+            )
         except Exception as e:
             log.error(f"Error in market_open_job: {e}", exc_info=True)
 
-
-
     def mid_day_job(self):
+        """Reconcile local positions against live Alpaca state."""
         try:
             ts, om, cal, tracker, da = self._get_services()
             if not cal.is_trading_day(): return
-            
-            log.info("Mid-day job: Syncing positions...")
+
+            log.info("Mid-day: syncing positions with Alpaca...")
             om.sync_positions()
+
             summary = tracker.get_portfolio_summary()
-            log.info(f"Current Value: ${summary['portfolio_value']:,.2f}. Positions: {len(tracker.get_all_positions())}")
+            log.info(
+                f"Mid-day value: ${float(summary['portfolio_value']):,.2f} | "
+                f"Positions: {int(summary['total_positions'])}"
+            )
         except Exception as e:
             log.error(f"Error in mid_day_job: {e}", exc_info=True)
 
     def market_close_job(self):
+        """
+        End-of-day close job.
+        Does NOT re-scan — trading already happened at open.
+        Only: sync positions, update to final closing prices, save EOD report.
+        """
         try:
             ts, om, cal, tracker, da = self._get_services()
             if not cal.is_trading_day(): return
-            
-            log.info("Market Close: Generating daily report...")
-            report = ts.run_daily_analysis()
-            
-            # Use NY time for the report filename
-            date_str = datetime.now(self.ny_tz).strftime('%Y%m%d')
-            report_path = f"risk/reports/risk_{date_str}.json"
-            os.makedirs('risk/reports', exist_ok=True)
-            
-            with open(report_path, 'w') as f:
-                json.dump(report, f, indent=4)
-            
-            log.info(f"Daily summary: End Value ${report.get('portfolio', {}).get('portfolio_value', 0):,.2f}")
+
+            log.info("Market Close: syncing final positions...")
+            om.sync_positions()
+
+            log.info("Market Close: updating final closing prices...")
+            ts.update_all_prices()
+
+            log.info("Market Close: saving EOD report...")
+            report_path = ts.save_daily_report()   # handles serialization + correct file path
+
+            summary = tracker.get_portfolio_summary()
+            log.info(
+                f"EOD — Portfolio: ${float(summary['portfolio_value']):,.2f} | "
+                f"Cash: ${float(summary['cash']):,.2f} | "
+                f"Return: {float(summary['return_pct']):+.2f}%"
+            )
+            log.info(f"EOD report saved: {report_path}")
+
         except Exception as e:
             log.error(f"Error in market_close_job: {e}", exc_info=True)
 
     def start(self):
         log.info("Live engine starting...")
-        
-        # Register all jobs with explicit NY Timezone enforcement
-        self.scheduler.add_job(self.pre_market_job, CronTrigger(hour=9, minute=15, day_of_week='mon-fri', timezone=self.ny_tz))
-        self.scheduler.add_job(self.market_open_job, CronTrigger(hour=9, minute=31, day_of_week='mon-fri', timezone=self.ny_tz))
-        self.scheduler.add_job(self.mid_day_job, CronTrigger(hour=12, minute=0, day_of_week='mon-fri', timezone=self.ny_tz))
+        self.scheduler.add_job(self.pre_market_job,   CronTrigger(hour=9,  minute=15, day_of_week='mon-fri', timezone=self.ny_tz))
+        self.scheduler.add_job(self.market_open_job,  CronTrigger(hour=9,  minute=31, day_of_week='mon-fri', timezone=self.ny_tz))
+        self.scheduler.add_job(self.mid_day_job,      CronTrigger(hour=12, minute=0,  day_of_week='mon-fri', timezone=self.ny_tz))
         self.scheduler.add_job(self.market_close_job, CronTrigger(hour=15, minute=55, day_of_week='mon-fri', timezone=self.ny_tz))
-        
+
         try:
             ny_now = datetime.now(self.ny_tz).strftime('%Y-%m-%d %H:%M:%S')
-            log.info(f"Live engine running. NY Current Time: {ny_now}")
+            log.info(f"Live engine running. NY time: {ny_now}")
             log.info("Press Ctrl+C to stop.")
             self.scheduler.start()
         except (KeyboardInterrupt, SystemExit):
@@ -151,5 +144,6 @@ class LiveEngine:
         if self.scheduler.running:
             self.scheduler.shutdown()
         log.info("Live engine stopped.")
+
 
 live_engine = LiveEngine()
