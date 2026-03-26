@@ -54,7 +54,8 @@ class BacktestEngine:
         
         self.initial_capital = Decimal(str(initial_capital))
         self.fill_simulator = fill_simulator or default_fill_simulator
-        
+        from risk.position_sizer import PositionSizer
+        self.sizer = PositionSizer()
         # Use data_access singleton
         if data_access is None:
             from data.data_engineer import data_access
@@ -165,9 +166,18 @@ class BacktestEngine:
         if signal['action'] == 'BUY':
             if self.tracker.get_position(ticker): return
             
-            # Calculate quantity
-            cash = float(self.tracker.cash)
-            quantity = int((cash * position_size) / current_price)
+            # ── AFTER (same PositionSizer as live _handle_buy()): ────────
+            summary = self.tracker.get_portfolio_summary()
+            portfolio_value = float(summary['portfolio_value'])
+            sizing = self.sizer.calculate(
+                portfolio_value = portfolio_value,
+                current_price   = current_price,
+                confidence      = signal.get('confidence', 0.0),
+                signal          = signal,       # passes target_price/stop_loss for Kelly
+            )
+            quantity = sizing['quantity']
+            # ─────────────────────────────────────────────────────────────
+
             if quantity <= 0: return
             
             # Risk check
