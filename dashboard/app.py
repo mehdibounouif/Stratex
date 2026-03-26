@@ -1,12 +1,13 @@
+
 """
 Quant_firm Performance Dashboard.
-Full implementation of Portfolio, Risk, Signals, and Backtest views.
+Enhanced version with Real-time Monitoring, Advanced Risk, and Strategy Analytics.
 """
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import os
 import sys
 import json
@@ -16,13 +17,26 @@ from decimal import Decimal
 # Ensure project root is in sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Import components
+from dashboard.components import (
+    display_kpi_row, display_system_health, display_risk_metrics,
+    display_performance_charts, display_strategy_heatmap,
+    display_order_history, display_config_viewer, display_export_buttons
+)
+
 # Import singletons
 from risk.portfolio.portfolio_tracker import position_tracker
 from strategies.strategy_researcher import strategy_engine
+from execution.alpaca_gateway import alpaca_gateway
 
-st.set_page_config(page_title="Quant_firm Dashboard", layout="wide", page_icon="📈")
+st.set_page_config(
+    page_title="Quant_firm | Dashboard", 
+    layout="wide", 
+    page_icon="📈",
+    initial_sidebar_state="expanded"
+)
 
-page = st.sidebar.radio("Navigation", ["Portfolio", "Risk", "Signals & Trades", "Backtest"])
+# --- Data Loading Helpers ---
 
 def _to_float(val):
     if isinstance(val, Decimal):
@@ -42,17 +56,14 @@ def load_reports():
             try:
                 with open(os.path.join(dir_path, f), 'r') as file:
                     data = json.load(file)
-                    # Extract date from filename if not in JSON
                     date_val = data.get('date')
                     if not date_val:
-                        # Extract YYYYMMDD from risk_YYYYMMDD.json
                         date_str = f.split('_')[1].split('.')[0]
                         try:
                             date_val = datetime.strptime(date_str, '%Y%m%d').strftime('%Y-%m-%d')
                         except:
                             date_val = date_str
                     
-                    # Flatten portfolio data
                     portfolio = data.get('portfolio', {})
                     flat_data = {
                         'date': date_val,
@@ -62,7 +73,6 @@ def load_reports():
                     }
                     reports.append(flat_data)
             except Exception as e:
-                st.sidebar.warning(f"Failed to load report {f}: {e}")
                 continue
     
     if not reports:
@@ -73,126 +83,185 @@ def load_reports():
     df = df.sort_values('date')
     return df
 
-if page == "Portfolio":
-    st_autorefresh(interval=60000)
-    st.title("Portfolio Status")
-    
-    summary = _to_float(position_tracker.get_portfolio_summary())
-    reports_df = load_reports()
-    
-    # KPI Row
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total Value", f"${summary['portfolio_value']:,.2f}")
-    c2.metric("Cash", f"${summary['cash']:,.2f}")
-    
-    pnl = summary.get('total_unrealized_pnl', 0) + summary.get('total_realized_pnl', 0)
-    c3.metric("Total P&L", f"${pnl:,.2f}", delta=f"{pnl:,.2f}")
-    
-    daily_chg = 0
-    if not reports_df.empty and len(reports_df) > 1:
-        daily_chg = reports_df.iloc[-1]['portfolio_value'] - reports_df.iloc[-2]['portfolio_value']
-    c4.metric("Daily Change", f"${daily_chg:,.2f}", delta=f"{daily_chg:,.2f}")
+def get_latest_report():
+    dir_path = 'risk/reports'
+    if os.path.exists(dir_path):
+        files = sorted([f for f in os.listdir(dir_path) if f.startswith('risk_') and f.endswith('.json')])
+        if files:
+            with open(os.path.join(dir_path, files[-1]), 'r') as f:
+                return json.load(f)
+    return {}
 
-    # Value Chart
-    st.subheader("Equity Curve")
-    if not reports_df.empty and len(reports_df) > 0:
-        try:
-            # Ensure we have at least 2 points for an area chart to look good
-            if len(reports_df) < 2:
-                st.info("Insufficient data history to render equity curve area. Showing single point.")
-                st.metric("Latest Value", f"${reports_df.iloc[-1]['portfolio_value']:,.2f}")
-            else:
-                fig = px.area(reports_df, x='date', y='portfolio_value', template='plotly_dark', title="Portfolio Value Over Time")
-                st.plotly_chart(fig, use_container_width=True)
-        except Exception as e:
-            st.error(f"Error rendering equity curve: {e}")
-            # Fallback to simple line chart or metric
+def load_signals():
+    sig_dir = 'strategies/signals'
+    sigs = []
+    if os.path.exists(sig_dir):
+        files = sorted(os.listdir(sig_dir), reverse=True)[:100]
+        for f in files:
             try:
-                st.line_chart(reports_df.set_index('date')['portfolio_value'])
-            except:
-                st.info("Insufficient data to render chart.")
-    else: 
-        st.info("No report data yet. Run the system to generate reports (risk/reports/risk_YYYYMMDD.json).")
+                with open(os.path.join(sig_dir, f), 'r') as file:
+                    sigs.append(json.load(file))
+            except: continue
+    return pd.DataFrame(sigs)
 
-    # Positions
+def load_orders():
+    order_file = 'execution/order_log.jsonl'
+    orders = []
+    if os.path.exists(order_file):
+        with open(order_file, 'r') as f:
+            for line in f:
+                try: orders.append(json.loads(line))
+                except: continue
+    return pd.DataFrame(orders)
+
+# --- Sidebar & Navigation ---
+
+st.sidebar.title("Quant_firm")
+st.sidebar.image("https://via.placeholder.com/150x50?text=QUANT+FIRM", use_column_width=True)
+
+page = st.sidebar.radio("Navigation", [
+    "🏠 Overview", 
+    "📊 Portfolio & Positions", 
+    "🛡️ Risk Management", 
+    "🧠 Strategy Insights",
+    "📜 Activity Log",
+    "⚙️ System Settings",
+    "🧪 Backtest Sandbox"
+])
+
+refresh_rate = st.sidebar.select_slider("Refresh Rate (s)", options=[10, 30, 60, 300], value=60)
+st_autorefresh(interval=refresh_rate * 1000, key="data_refresh")
+
+# --- Page Content ---
+
+summary = _to_float(position_tracker.get_portfolio_summary())
+reports_df = load_reports()
+signals_df = load_signals()
+orders_df = load_orders()
+latest_report = get_latest_report()
+
+if page == "🏠 Overview":
+    st.title("Trading Overview")
+    display_kpi_row(summary, reports_df)
+    
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        display_performance_charts(reports_df)
+    with col2:
+        display_system_health(alpaca_gateway)
+        st.divider()
+        st.subheader("Asset Allocation")
+        pos = _to_float(position_tracker.get_all_positions())
+        if pos:
+            df_pos = pd.DataFrame(pos)
+            fig_pie = px.pie(df_pos, values='market_value', names='ticker', hole=0.4, template='plotly_dark')
+            st.plotly_chart(fig_pie, use_container_width=True)
+        else:
+            st.info("No active positions.")
+
+elif page == "📊 Portfolio & Positions":
+    st.title("Portfolio & Positions")
+    
     st.subheader("Open Positions")
     pos = _to_float(position_tracker.get_all_positions())
     if pos:
         df_pos = pd.DataFrame(pos)
-        st.dataframe(df_pos.style.background_gradient(subset=['unrealized_pnl'], cmap='RdYlGn'))
+        st.dataframe(
+            df_pos.style.background_gradient(subset=['unrealized_pnl'], cmap='RdYlGn'),
+            use_container_width=True
+        )
+        display_export_buttons(df_pos, "positions")
+    else:
+        st.info("No open positions.")
         
-        fig_pie = px.pie(df_pos, values='market_value', names='ticker', hole=0.4)
-        st.plotly_chart(fig_pie)
-    else: st.info("No open positions.")
-
-elif page == "Risk":
-    st.title("Risk Analysis")
-    reports_df = load_reports()
-    
+    st.divider()
+    st.subheader("Historical Snapshots")
     if not reports_df.empty:
-        vals = reports_df['portfolio_value']
-        rets = vals.pct_change().dropna()
-        sharpe = (rets.mean() / rets.std() * (252**0.5)) if len(rets) > 1 and rets.std() > 0 else 0
-        mdd = ((vals - vals.cummax()) / vals.cummax()).min()
-        
-        r1, r2, r3, r4 = st.columns(4)
-        r1.metric("Sharpe Ratio", f"{sharpe:.2f}")
-        r2.metric("Max Drawdown", f"{mdd:.2%}")
-        r3.metric("Daily Return Std", f"{rets.std():.2%}")
-        r4.metric("Volatility (Ann)", f"{rets.std() * (252**0.5):.2%}")
-        
-        # Drawdown Chart
-        st.subheader("Drawdown History")
-        dd = (vals - vals.cummax()) / vals.cummax()
-        fig_dd = px.area(x=reports_df['date'], y=dd, title="Drawdown %", template='plotly_dark')
-        fig_dd.update_traces(fillcolor='rgba(255,0,0,0.3)', line_color='red')
-        st.plotly_chart(fig_dd, use_container_width=True)
-    else: st.info("No data available.")
+        st.dataframe(reports_df.sort_values('date', ascending=False), use_container_width=True)
+    else:
+        st.info("No historical data available.")
 
-elif page == "Signals & Trades":
-    st.title("Activity Feed")
+elif page == "🛡️ Risk Management":
+    st.title("Risk Management Dashboard")
+    display_risk_metrics(latest_report)
     
-    st.subheader("Recent Signals")
-    sig_dir = 'strategies/signals'
-    if os.path.exists(sig_dir):
-        files = sorted(os.listdir(sig_dir), reverse=True)[:50]
-        sigs = []
-        for f in files:
-            with open(os.path.join(sig_dir, f), 'r') as file:
-                sigs.append(json.load(file))
-        df_sig = pd.DataFrame(sigs)
-        if not df_sig.empty:
-            st.dataframe(df_sig[['timestamp', 'ticker', 'strategy', 'action', 'confidence', 'reasoning']])
+    st.divider()
+    col1, col2 = st.columns(2)
     
-    st.subheader("Order Log")
-    if os.path.exists('execution/order_log.jsonl'):
-        with open('execution/order_log.jsonl', 'r') as f:
-            orders = [json.loads(line) for line in f.readlines()][-50:]
-        st.dataframe(pd.DataFrame(orders))
+    with col1:
+        st.subheader("Sector Exposure")
+        sector_data = latest_report.get('sector_analysis', {}).get('breakdown', {})
+        if sector_data:
+            df_sector = pd.DataFrame(list(sector_data.items()), columns=['Sector', 'Weight'])
+            fig = px.bar(df_sector, x='Sector', y='Weight', template='plotly_dark')
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No sector data available.")
+            
+    with col2:
+        st.subheader("Concentration Risk")
+        conc = latest_report.get('position_analysis', {}).get('concentration_risk', {})
+        if conc:
+            st.json(conc)
+        else:
+            st.info("No concentration data available.")
 
-elif page == "Backtest":
+elif page == "🧠 Strategy Insights":
+    st.title("Strategy Insights")
+    display_strategy_heatmap(signals_df)
+    
+    st.divider()
+    st.subheader("Signal Feed")
+    if not signals_df.empty:
+        st.dataframe(signals_df, use_container_width=True)
+        display_export_buttons(signals_df, "signals")
+    else:
+        st.info("No signals found.")
+
+elif page == "📜 Activity Log":
+    st.title("Trading Activity Log")
+    display_order_history(orders_df)
+    
+    if not orders_df.empty:
+        display_export_buttons(orders_df, "orders")
+
+elif page == "⚙️ System Settings":
+    st.title("System Settings & Controls")
+    display_config_viewer()
+
+elif page == "🧪 Backtest Sandbox":
     st.title("Backtest Sandbox")
-    with st.sidebar:
-        t = st.text_input("Ticker", "AAPL")
-        s = st.date_input("Start", value=date(2024,1,1))
-        e = st.date_input("End", value=date(2024,12,31))
-        strat = st.selectbox("Strategy", strategy_engine.list_strategies())
-        cap = st.number_input("Capital", value=20000)
-        run = st.button("Execute Backtest")
+    with st.expander("Backtest Configuration", expanded=True):
+        c1, c2, c3 = st.columns(3)
+        ticker = c1.text_input("Ticker", "AAPL")
+        start_date = c2.date_input("Start Date", value=date(2024, 1, 1))
+        end_date = c3.date_input("End Date", value=date(2024, 12, 31))
+        
+        strat_list = strategy_engine.list_strategies()
+        strat = st.selectbox("Select Strategy", strat_list)
+        cap = st.number_input("Initial Capital", value=20000)
+        run = st.button("🚀 Run Backtest", use_container_width=True)
 
     if run:
         from system.backtest_engine import BacktestEngine
-        strategy = strategy_engine.strategies[strat]
-        engine = BacktestEngine(strategy, initial_capital=cap)
-        res = engine.run(t, str(s), str(e))
+        with st.spinner(f"Running {strat} on {ticker}..."):
+            strategy = strategy_engine.strategies[strat]
+            engine = BacktestEngine(strategy, initial_capital=cap)
+            res = engine.run(ticker, str(start_date), str(end_date))
         
         if res:
+            st.success("Backtest Completed!")
             b1, b2, b3, b4 = st.columns(4)
-            b1.metric("Return", f"{res['total_return']}%")
-            b2.metric("Sharpe", f"{res['sharpe_ratio']}")
-            b3.metric("MDD", f"{res['max_drawdown']}%")
-            b4.metric("Trades", res['total_trades'])
+            b1.metric("Total Return", f"{res['total_return']}%")
+            b2.metric("Sharpe Ratio", f"{res['sharpe_ratio']}")
+            b3.metric("Max Drawdown", f"{res['max_drawdown']}%")
+            b4.metric("Total Trades", res['total_trades'])
             
-            st.plotly_chart(px.line(y=res['daily_values'], title="Equity Curve"), use_container_width=True)
-            st.subheader("Trade History")
-            st.dataframe(pd.DataFrame(res['trades']))
+            fig = px.line(y=res['daily_values'], title=f"Equity Curve: {strat} on {ticker}", template='plotly_dark')
+            fig.update_layout(xaxis_title="Days", yaxis_title="Portfolio Value")
+            st.plotly_chart(fig, use_container_width=True)
+            
+            st.subheader("Trade Details")
+            st.dataframe(pd.DataFrame(res['trades']), use_container_width=True)
+        else:
+            st.error("Backtest failed to produce results. Check logs for details.")
