@@ -43,12 +43,12 @@ def run_backtest(ticker, start, end, strategy_name):
     else:
         print("Backtest failed or returned no data.")
 
-# def run_dashboard():
-#     log.info("Launching Dashboard...")
-#     try:
-#         subprocess.run(['streamlit', 'run', 'dashboard/app.py'])
-#     except KeyboardInterrupt:
-#         pass
+def run_dashboard():
+    log.info("Launching Dashboard...")
+    try:
+        subprocess.run(['streamlit', 'run', 'dashboard/app.py'])
+    except KeyboardInterrupt:
+        pass
 
 def interactive_menu():
     from system.system_architect import trading_system
@@ -74,7 +74,7 @@ def main():
     parser.add_argument('--live', action='store_true')
     parser.add_argument('--backtest', nargs=3, metavar=('TICKER', 'START', 'END'))
     parser.add_argument('--strategy', default=TradingConfig.DEFAULT_STRATEGY)
-#    parser.add_argument('--dashboard', action='store_true')
+    parser.add_argument('--dashboard', action='store_true')
     
     args = parser.parse_args()
     
@@ -83,8 +83,8 @@ def main():
             run_live()
         elif args.backtest:
             run_backtest(args.backtest[0], args.backtest[1], args.backtest[2], args.strategy)
-        # elif args.dashboard:
-        #     run_dashboard()
+        elif args.dashboard:
+            run_dashboard()
         else:
             interactive_menu()
     except KeyboardInterrupt:
