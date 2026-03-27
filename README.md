@@ -146,7 +146,7 @@ Production-grade strategy with trend filter.
 
 ### Pairs Trading (Statistical Arbitrage)
 
-Advanced cointegration-based strategy (registered but disabled by default).
+Advanced cointegration-based strategy .
 
 - Engle-Granger cointegration test (rejects non-mean-reverting pairs)
 - Dynamic OLS hedge ratio (proper β instead of hardcoded 1:1)
