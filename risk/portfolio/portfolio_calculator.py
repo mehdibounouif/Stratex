@@ -1050,7 +1050,7 @@ class PortfolioCalculator:
                 "max_drawdown" : round(Decimal(str(max_dd)),     6),
                 "peak_value"   : round(Decimal(str(best_peak)),  2),
                 "trough_value" : round(Decimal(str(trough_val)), 2),
-                "peak_date"    : str(best_peak_date.date()),
+                "peak_date": str(pd.Timestamp(best_peak_date).date()) if best_peak_date else None,
                 "trough_date"  : str(trough_date.date()),
             }
 

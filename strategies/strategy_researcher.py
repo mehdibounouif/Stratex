@@ -3,8 +3,8 @@ Strategy registry and researcher engine.
 """
 from strategies.rsi_strategy import rsi_strategy
 from strategies.momentum_strategy import momentum_strategy
-from strategies.mean_reversion_strategy import mean_reversion_strategy
-from strategies.pairs_strategy import pairs_strategy
+# from strategies.mean_reversion_strategy import mean_reversion_strategy
+# from strategies.pairs_strategy import pairs_strategy
 #from strategies.ml_signal_strategy import ml_signal_strategy
 from config.trading_config import TradingConfig
 from logger import get_logger
@@ -16,7 +16,7 @@ class StrategyResearcher:
         self.strategies = {
             'rsi_mean_reversion':  rsi_strategy,
             'momentum':            momentum_strategy,
-            'mean_reversion':      mean_reversion_strategy,
+            #'mean_reversion':      mean_reversion_strategy,
             #'pairs':               pairs_strategy,
             #'ml_signal':           ml_signal_strategy,
         }
