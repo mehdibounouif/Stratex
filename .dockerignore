@@ -1,0 +1,25 @@
+# Exclude venv and pycache
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Exclude source control and local env
+.git/
+.gitignore
+.env
+.github/
+
+# Exclude local data and logs
+data/*.csv
+data/*.db
+data/*.json
+logs/*.log
+risk/reports/*.json
+optimization_results/*.json
+
+# Exclude build artifacts
+build/
+dist/
+*.egg-info/
