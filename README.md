@@ -1,4 +1,4 @@
-# Quant_firm
+# Stratex
 
 > **A production-grade quantitative trading system** — multi-strategy signal generation, institutional-level risk management, backtesting engine, live paper trading via Alpaca, and a real-time Streamlit dashboard. Built in Python, designed for serious algorithmic trading research and deployment.
 
@@ -26,7 +26,7 @@
 
 ## Overview
 
-Quant_firm is a full-stack algorithmic trading platform built for quantitative research and live execution. It combines classical technical strategies (RSI, Momentum, Bollinger Bands, Pairs Trading) with an optional AI signal layer powered by GPT, all routed through a strict risk gate before any trade is executed.
+Stratex is a full-stack algorithmic trading platform built for quantitative research and live execution. It combines classical technical strategies (RSI, Momentum, Bollinger Bands, Pairs Trading) with an optional AI signal layer powered by GPT, all routed through a strict risk gate before any trade is executed.
 
 The system is built around three core principles:
 
