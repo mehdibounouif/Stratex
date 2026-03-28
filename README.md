@@ -26,7 +26,7 @@
 
 ## Overview
 
-Quant_firm is a full-stack algorithmic trading platform built for quantitative research and live execution. It combines classical technical strategies (RSI, Momentum, Bollinger Bands, Pairs Trading) with an optional AI signal layer powered by GPT, all routed through a strict risk gate before any trade is executed.
+Stratex is a full-stack algorithmic trading platform built for quantitative research and live execution. It combines classical technical strategies (RSI, Momentum, Bollinger Bands, Pairs Trading) with an optional AI signal layer powered by GPT, all routed through a strict risk gate before any trade is executed.
 
 The system is built around three core principles:
 
