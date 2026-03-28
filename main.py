@@ -50,6 +50,38 @@ def run_dashboard():
     except KeyboardInterrupt:
         pass
 
+
+def run_optimize(ticker, start, end, strategy_name):
+    from system.walk_forward_optimizer import WalkForwardOptimizer
+
+    # Import the strategy CLASS (not the instance — we need fresh ones per combo)
+    if strategy_name == 'rsi_mean_reversion':
+        from strategies.rsi_strategy import RSIStrategy
+        strategy_class = RSIStrategy
+    elif strategy_name == 'momentum':
+        print("⚠️  Walk-forward optimizer currently supports rsi_mean_reversion.")
+        print("    Defaulting to RSIStrategy.")
+        from strategies.rsi_strategy import RSIStrategy
+        strategy_class = RSIStrategy
+    else:
+        print(f"Error: Strategy '{strategy_name}' not supported for optimization.")
+        return
+
+    print(f"\n🔍 Running Walk-Forward Optimization")
+    print(f"   Ticker  : {ticker}")
+    print(f"   Period  : {start} → {end}")
+    print(f"   Strategy: {strategy_name}")
+    print("   This may take a few minutes...\n")
+
+    opt = WalkForwardOptimizer(strategy_class)
+    results = opt.run(ticker, start, end)
+
+    if results:
+        filepath = opt.save_results(results)
+        print(f"\n✅ Results saved to: {filepath}")
+    else:
+        print("\n❌ Optimization failed. Check logs above.")
+
 def interactive_menu():
     from system.system_architect import trading_system
     while True:
@@ -75,12 +107,16 @@ def main():
     parser.add_argument('--backtest', nargs=3, metavar=('TICKER', 'START', 'END'))
     parser.add_argument('--strategy', default=TradingConfig.DEFAULT_STRATEGY)
     parser.add_argument('--dashboard', action='store_true')
+    parser.add_argument('--optimize', nargs=3, metavar=('TICKER', 'START', 'END'),
+                        help='Walk-forward optimization. e.g. --optimize AAPL 2023-01-01 2024-12-31')
     
     args = parser.parse_args()
     
     try:
         if args.live:
             run_live()
+        elif args.optimize:
+            run_optimize(args.optimize[0], args.optimize[1], args.optimize[2], args.strategy)
         elif args.backtest:
             run_backtest(args.backtest[0], args.backtest[1], args.backtest[2], args.strategy)
         elif args.dashboard:
