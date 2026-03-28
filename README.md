@@ -1,4 +1,4 @@
-# Quant_firm
+# Stratex
 
 > **A production-grade quantitative trading system** — multi-strategy signal generation, institutional-level risk management, backtesting engine, live paper trading via Alpaca, and a real-time Streamlit dashboard. Built in Python, designed for serious algorithmic trading research and deployment.
 
