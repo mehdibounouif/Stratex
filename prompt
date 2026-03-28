@@ -1,0 +1,201 @@
+You are a senior Python engineer working on a production-grade algorithmic trading platform called Stratex.
+
+## PROJECT CONTEXT
+
+Repository: https://github.com/mehdibounouif/Stratex
+
+The codebase structure (root is `Quant_firm/`):
+- `main.py` — entry point with CLI flags (--live, --backtest, --dashboard)
+- `logger.py` — centralized logger writing to /logs/ (system, trades, errors, risk, etc.)
+- `config/base_config.py` — env vars, API keys, paths
+- `config/trading_config.py` — capital, watchlist, strategy settings
+- `config/risk_config.py` — all risk limits
+- `system/system_architect.py` — TradingSystem class (central orchestrator)
+- `system/live_engine.py` — APScheduler cron jobs (pre-market, open, mid-day, close)
+- `risk/risk_manager.py` — 6-check gate before every trade
+- `risk/trade_audit.py` — JSONL audit trail
+- `risk/portfolio/portfolio_tracker.py` — positions, cash, P&L
+- `execution/alpaca_gateway.py` — Alpaca broker gateway
+- `strategies/` — RSI, Momentum, MeanReversion, Pairs strategies
+- `data/data_engineer.py` — data access facade
+- `dashboard/app.py` — Streamlit dashboard
+
+The system already uses: Python 3.10+, APScheduler, SQLite, yfinance, Alpaca API, Streamlit, pandas, pytest.
+
+---
+
+## YOUR TASK
+
+Implement the following three production features. Each must integrate cleanly into the existing architecture — no rewrites, no breaking changes, no standalone scripts. Everything must respect the existing patterns: config in `/config/`, logging via `logger.py`, tests in `/test/`.
+
+---
+
+### FEATURE 1 — ALERT SYSTEM (Telegram + Email)
+
+**Goal:** Send real-time alerts when a trade signal fires or a risk limit is breached.
+
+**Implementation requirements:**
+
+1. Create `notifications/` package with:
+   - `notifications/__init__.py`
+   - `notifications/alert_manager.py` — `AlertManager` class, the single entry point for all alerts
+   - `notifications/telegram_notifier.py` — wraps `python-telegram-bot` async send
+   - `notifications/email_notifier.py` — wraps `smtplib` with TLS (Gmail-compatible)
+   - `notifications/alert_templates.py` — message formatters for each alert type
+
+2. `AlertManager` must have these methods:
+   - `send_signal_alert(ticker, action, confidence, price, strategy, reasoning)` — fires when a BUY/SELL signal passes the risk gate
+   - `send_risk_alert(check_name, details, severity)` — fires when daily loss circuit or max drawdown halt triggers
+   - `send_trade_executed_alert(ticker, action, shares, price, total_value)` — fires after Alpaca order is placed
+   - `send_system_alert(message, level)` — fires for system startup, shutdown, critical errors
+
+3. Both channels must be optional and independently toggleable. If credentials are missing, the channel silently skips (logs a warning, never throws).
+
+4. Alert templates must be clean and informative. Example for Telegram:
+🟢 SIGNAL FIRED — BUY AAPL
+Strategy: RSI Mean Reversion
+Confidence: 78%
+Price: $189.42
+Reasoning: RSI dropped to 23.1 (oversold threshold: 25)
+Time: 2025-01-15 09:37:22 EST
+
+5. Add to `config/base_config.py` (or a new `config/notifications_config.py`):
+```python
+   TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+   TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+   ALERT_EMAIL_SENDER = os.getenv("ALERT_EMAIL_SENDER", "")
+   ALERT_EMAIL_PASSWORD = os.getenv("ALERT_EMAIL_PASSWORD", "")
+   ALERT_EMAIL_RECIPIENT = os.getenv("ALERT_EMAIL_RECIPIENT", "")
+   ENABLE_TELEGRAM_ALERTS = os.getenv("ENABLE_TELEGRAM_ALERTS", "false").lower() == "true"
+   ENABLE_EMAIL_ALERTS = os.getenv("ENABLE_EMAIL_ALERTS", "false").lower() == "true"
+   ALERT_ON_SIGNALS = True       # BUY/SELL signal fired
+   ALERT_ON_RISK_BREACH = True   # circuit breaker / drawdown halt
+   ALERT_ON_TRADE_EXECUTED = True
+   ALERT_ON_SYSTEM_EVENTS = True
+```
+
+6. Hook into existing code:
+   - In `system/system_architect.py` → `_execute_trade()`: call `alert_manager.send_signal_alert()` before execution and `send_trade_executed_alert()` after
+   - In `risk/risk_manager.py` → when `MAX_DAILY_LOSS` or `MAX_DRAWDOWN_BEFORE_HALT` check fails: call `alert_manager.send_risk_alert()`
+   - In `system/live_engine.py` → on engine start/stop: call `alert_manager.send_system_alert()`
+
+7. Telegram uses async send wrapped in `asyncio.run()` for compatibility with APScheduler's sync context. Never block the main trading loop — wrap sends in try/except with timeout.
+
+8. Write `test/test_alert_manager.py` with mocked notifiers testing: signal alert formatting, risk alert delivery, graceful failure when credentials missing.
+
+---
+
+### FEATURE 2 — DOCKER DEPLOYMENT
+
+**Goal:** Package the entire system into a container that runs on any cloud server (AWS EC2, DigitalOcean, Railway, etc.) with zero manual setup.
+
+**Implementation requirements:**
+
+1. Create `Dockerfile` in root:
+   - Base: `python:3.10-slim`
+   - Install system deps: `gcc`, `g++`, `libssl-dev` (needed for some TA-Lib wheels)
+   - Copy `requirements.txt` and install deps
+   - Copy full project
+   - Create `/app/logs/` and `/app/data/` directories inside container
+   - Default CMD: `python main.py --live`
+   - Expose port `8000` (for the REST API, Feature 3) and `8501` (Streamlit)
+   - Use non-root user for security
+
+2. Create `docker-compose.yml` with three services:
+   - `stratex` — the main trading engine (`python main.py --live`)
+   - `dashboard` — Streamlit (`streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0`)
+   - `api` — the REST API server (`python -m uvicorn api.main:app --host 0.0.0.0 --port 8000`)
+   
+   All three services share:
+   - The same `./data` volume mount for SQLite persistence across restarts
+   - The same `./logs` volume mount
+   - The same `.env` file (env_file: .env)
+   - A `restart: unless-stopped` policy
+
+3. Create `.dockerignore`:
+   - Exclude: `venv/`, `__pycache__/`, `*.pyc`, `.git/`, `*.egg-info`, `.env`
+
+4. Update `.env.example` with all new variables from Feature 1 and Feature 3.
+
+5. Add a `scripts/start.sh` entrypoint script that:
+   - Waits for SQLite file to exist or creates it
+   - Runs `python -c "from data.database import init_db; init_db()"` on first run
+   - Then exec the command passed to the container
+
+6. Add a `DEPLOYMENT.md` documenting exactly how to deploy to a fresh Ubuntu 22.04 server: install Docker, clone repo, set .env, run `docker-compose up -d`.
+
+---
+
+### FEATURE 3 — REST API LAYER
+
+**Goal:** Expose Stratex's signals, portfolio state, and controls via HTTP endpoints so external tools (mobile apps, scripts, other services) can connect programmatically.
+
+**Implementation requirements:**
+
+1. Create `api/` package:
+   - `api/__init__.py`
+   - `api/main.py` — FastAPI app instance, router registration, startup/shutdown events
+   - `api/routes/signals.py` — signal-related endpoints
+   - `api/routes/portfolio.py` — portfolio state endpoints
+   - `api/routes/system.py` — system control and health endpoints
+   - `api/models.py` — Pydantic request/response models for all endpoints
+   - `api/auth.py` — API key authentication middleware
+   - `api/dependencies.py` — shared FastAPI dependencies (get_trading_system, etc.)
+
+2. Implement these endpoints:
+
+   **Signals:**
+   - `GET /api/v1/signals` — returns the last N signals generated (from audit trail / in-memory cache), with optional `?ticker=AAPL&action=BUY&limit=50` filters
+   - `GET /api/v1/signals/latest` — returns the most recent signal per ticker across all strategies
+   - `POST /api/v1/signals/analyze` — triggers an on-demand analysis for a given ticker body `{"ticker": "AAPL", "strategy": "rsi_mean_reversion"}`, returns the generated signal dict
+
+   **Portfolio:**
+   - `GET /api/v1/portfolio` — full portfolio state: cash, total value, return %, positions list
+   - `GET /api/v1/portfolio/positions` — open positions with entry price, current price, unrealized P&L
+   - `GET /api/v1/portfolio/metrics` — risk metrics: drawdown, daily loss %, Sharpe ratio, beta
+   - `GET /api/v1/portfolio/history` — historical daily P&L values (from portfolio_tracker)
+
+   **System:**
+   - `GET /api/v1/health` — system health: data pipeline status, last update time, scheduler status, uptime
+   - `GET /api/v1/watchlist` — current watchlist tickers
+   - `POST /api/v1/watchlist` — add a ticker `{"ticker": "AMD"}`
+   - `DELETE /api/v1/watchlist/{ticker}` — remove a ticker
+   - `GET /api/v1/audit` — last N audit log entries with optional filters
+   - `POST /api/v1/system/scan` — trigger a full watchlist scan immediately (async, returns job_id)
+
+3. Authentication: every endpoint requires `X-API-Key: <value>` header. Key is set via `API_SECRET_KEY` env var. Return `401 Unauthorized` if missing or wrong. Add to `config/base_config.py`:
+```python
+   API_SECRET_KEY = os.getenv("API_SECRET_KEY", "change-me-in-production")
+   API_HOST = os.getenv("API_HOST", "0.0.0.0")
+   API_PORT = int(os.getenv("API_PORT", "8000"))
+```
+
+4. The API must reuse the existing `TradingSystem` singleton — do NOT instantiate a separate system. Use a shared state object or FastAPI lifespan to hold the reference.
+
+5. All response models must use Pydantic v2. Every response must include a `timestamp` field. Use proper HTTP status codes (200, 201, 400, 401, 404, 500).
+
+6. Add CORS middleware allowing all origins (configurable) so a frontend or mobile app can call it.
+
+7. Add `api/` to `main.py` so `python main.py --api` starts the API server standalone (for cases where you don't want the full live engine).
+
+8. Write `test/test_api.py` using `httpx` and FastAPI's `TestClient` testing: auth rejection, portfolio endpoint response shape, signal endpoint filtering, health endpoint structure.
+
+9. Add to `requirements.txt`: `fastapi>=0.110.0`, `uvicorn[standard]>=0.27.0`, `httpx>=0.26.0` (for tests), `python-telegram-bot>=20.0`, `pydantic>=2.0`.
+
+---
+
+## STRICT CONSTRAINTS
+
+- **Do not modify** `system/system_architect.py` in a way that breaks existing behavior. Only add hooks (calls to AlertManager, nothing else).
+- **Do not modify** existing test files. Only add new test files.
+- **Do not change** the config file structure. Only append new variables.
+- Every new file must have a module docstring explaining what it does.
+- Use the existing `logger.py` for all logging — never use `print()`.
+- All new env variables must be added to `.env.example` with placeholder values and inline comments.
+- Async code (Telegram) must never block APScheduler's sync jobs.
+- The `AlertManager` must be a singleton instantiated once and injected, not imported globally everywhere.
+- No hardcoded credentials, tokens, or secrets anywhere in the code.
+
+## DELIVERABLES
+
+Produce all new files with complete, production-ready code. For each file, show the full path and full content. At the end, show the complete updated `requirements.txt` and `.env.example`.
