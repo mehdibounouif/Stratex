@@ -1,6 +1,6 @@
 # Stratex
 
-> **A production-grade quantitative trading system** — multi-strategy signal generation, institutional-level risk management, backtesting engine, live paper trading via Alpaca, and a real-time Streamlit dashboard. Built in Python, designed for serious algorithmic trading research and deployment.
+> **A production-grade quantitative trading system** — multi-strategy signal generation, institutional-level risk management, walk-forward optimization, backtesting engine, live paper trading via Alpaca, real-time Streamlit dashboard, and full Docker deployment. Built in Python, designed for serious algorithmic trading research and deployment.
 
 ---
 
@@ -10,7 +10,9 @@
 - [Architecture](#architecture)
 - [Features](#features)
 - [Strategies](#strategies)
+- [Walk-Forward Optimization](#walk-forward-optimization)
 - [Risk Management](#risk-management)
+- [Docker Deployment](#docker-deployment)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
 - [Configuration](#configuration)
@@ -34,7 +36,7 @@ The system is built around three core principles:
 - **Risk first** — no trade bypasses the 6-check risk engine; two checks (daily loss, max drawdown) always fail closed
 - **Graceful degradation** — the system runs on `yfinance` alone; AI and fundamentals are optional enhancements
 
-**Initial capital:** $20,000 · **Default strategy:** RSI Mean Reversion · **Default watchlist:** AAPL, MSFT, NVDA, GOOGL, META, TSLA, AMZN, AMD, NFLX
+**Initial capital:** $100,000 · **Default strategy:** RSI Mean Reversion · **Default watchlist:** AAPL, MSFT, NVDA, GOOGL, META, TSLA, AMZN, AMD, NFLX
 
 ---
 
@@ -44,17 +46,19 @@ The system is built around three core principles:
 main.py
 ├── --live          → LiveEngine (APScheduler cron jobs)
 ├── --backtest      → BacktestEngine (historical simulation)
+├── --optimize      → WalkForwardOptimizer (parameter search)
 ├── --dashboard     → Streamlit dashboard
 └── (default)       → Interactive CLI menu
 
 TradingSystem (system_architect.py)
-├── DataEngineer        → SQLite cache → yfinance
-├── StrategyResearcher  → RSI / Momentum / MeanReversion / Pairs
-├── SignalAggregator    → Conflict resolution, confidence scoring
-├── RiskManager         → 6-check gate (position, cash, sector, loss, drawdown)
-├── PositionSizer       → Fixed Fractional or Kelly Criterion
-├── TradeAudit          → JSONL audit trail
-└── AlpacaGateway       → Paper / live order execution
+├── DataEngineer            → SQLite cache → yfinance
+├── StrategyResearcher      → RSI / Momentum / MeanReversion / Pairs
+├── SignalAggregator        → Conflict resolution, confidence scoring
+├── RiskManager             → 6-check gate (position, cash, sector, loss, drawdown)
+├── PositionSizer           → Fixed Fractional or Kelly Criterion
+├── TradeAudit              → JSONL audit trail
+├── WalkForwardOptimizer    → Rolling-window parameter optimization
+└── AlpacaGateway           → Paper / live order execution
 ```
 
 **Daily execution flow:**
@@ -81,6 +85,7 @@ run_daily_analysis()
 | Feature | Description |
 |---|---|
 | **Multi-strategy signals** | RSI, Momentum, Bollinger Bands, Pairs Trading — all run in parallel |
+| **Walk-forward optimization** | Automatically finds best strategy parameters using rolling time windows |
 | **Signal aggregation** | Majority-vote conflict resolution with confidence bonuses |
 | **6-check risk gate** | Position size, cash reserve, open positions, sector exposure, daily loss, max drawdown |
 | **Position sizing** | Fixed fractional (confidence-scaled) or Kelly Criterion (half-Kelly default) |
@@ -89,6 +94,7 @@ run_daily_analysis()
 | **Smart data caching** | SQLite-first, yfinance fallback — strategies never wait for API calls |
 | **Full audit trail** | Every trade decision logged to JSONL with full reasoning and risk check results |
 | **Streamlit dashboard** | Real-time portfolio KPIs, strategy heatmap, order history, risk metrics |
+| **Docker deployment** | Full containerized deployment with docker-compose — runs anywhere |
 | **AI signal layer** | Optional GPT-4o-mini via TradingAgents (disabled by default) |
 | **Graceful degradation** | Runs without OpenAI or Alpha Vantage keys — yfinance is always the baseline |
 
@@ -146,7 +152,7 @@ Production-grade strategy with trend filter.
 
 ### Pairs Trading (Statistical Arbitrage)
 
-Advanced cointegration-based strategy .
+Advanced cointegration-based strategy.
 
 - Engle-Granger cointegration test (rejects non-mean-reverting pairs)
 - Dynamic OLS hedge ratio (proper β instead of hardcoded 1:1)
@@ -178,9 +184,82 @@ self.strategies = {
 
 ---
 
+## Walk-Forward Optimization
+
+Walk-forward optimization (WFO) automatically finds the best strategy parameters without overfitting to historical data. Instead of testing one parameter set over the full date range, it uses rolling windows:
+
+```
+Window 1: Train Jan–Jun 2023 → find best params → Test Jul–Aug 2023
+Window 2: Train Mar–Aug 2023 → find best params → Test Sep–Oct 2023
+Window 3: Train May–Oct 2023 → find best params → Test Nov–Dec 2023
+...
+```
+
+Each "train" phase searches all parameter combinations. The "test" phase validates them on unseen data. The final output shows which parameters actually hold up across real market conditions.
+
+### Running the Optimizer
+
+```bash
+# Optimize RSI strategy on AAPL over 2 years
+python main.py --optimize AAPL 2023-01-01 2024-12-31
+
+# Use with a specific strategy
+python main.py --optimize NVDA 2022-01-01 2024-12-31 --strategy rsi_mean_reversion
+```
+
+### Output
+
+Results are saved to `optimization_results/wfo_<TICKER>_<timestamp>.json` and printed to the console:
+
+```
+============================================================
+  WALK-FORWARD OPTIMIZATION RESULTS — AAPL
+============================================================
+  Metric used for ranking : sharpe_ratio
+  Total windows tested    : 6
+  Profitable windows      : 4 (66.7%)
+  Avg test return         : +2.14%
+  Avg test Sharpe ratio   : 0.812
+  Avg test max drawdown   : -3.21%
+------------------------------------------------------------
+  CONSENSUS (most-selected) parameters:
+    rsi_buy              = 20
+    rsi_sell             = 75
+    holding_days         = 5
+    stop_loss            = 0.05
+  Selected in 50% of windows
+============================================================
+```
+
+### Applying Results to Your Strategy
+
+Open `strategies/rsi_strategy.py` and update the singleton at the bottom:
+
+```python
+# Update with your consensus_params from the optimizer output
+rsi_strategy = RSIStrategy(rsi_buy=20, rsi_sell=75, holding_days=5, stop_loss=0.05)
+```
+
+### Customizing the Parameter Grid
+
+Edit `DEFAULT_RSI_PARAM_GRID` in `system/walk_forward_optimizer.py`:
+
+```python
+DEFAULT_RSI_PARAM_GRID = {
+    "rsi_buy":      [20, 25, 30],
+    "rsi_sell":     [70, 75, 80],
+    "holding_days": [3, 5, 7],
+    "stop_loss":    [0.03, 0.05, 0.07],
+}
+```
+
+> **Note:** 4 parameters × 3 values = 81 combinations per window. With 6 windows, expect 3–7 minutes to complete.
+
+---
+
 ## Risk Management
 
-Every trade passes through a **6-check gate** before execution. Two checks always fail closed — they cannot be overridden.
+Every trade passes through a **6-check gate** before execution. Two checks always fail closed.
 
 | Check | Limit | Fail behavior |
 |---|---|---|
@@ -194,23 +273,102 @@ Every trade passes through a **6-check gate** before execution. Two checks alway
 Additional trade-level protection:
 - Default stop-loss: **5%** per trade
 - Default take-profit: **10%** per trade
-- Minimum signal confidence: **55%** (configurable)
+- Minimum signal confidence: **55%**
 - Min Sharpe ratio threshold: **1.0**
 - Max portfolio beta: **1.5**
 - Max inter-asset correlation: **0.80**
 
 ### Position Sizing
 
-Two methods selectable via `TradingConfig.POSITION_SIZING_METHOD`:
+**Fixed Fractional (default):** Allocates a fixed percentage of portfolio per trade, scaled by signal confidence.
 
-**Fixed Fractional (default):** Allocates a fixed percentage of portfolio per trade, optionally scaled by signal confidence.
-
-**Kelly Criterion:** Mathematically optimal sizing for long-term growth.
+**Kelly Criterion:** Mathematically optimal sizing.
 ```
 f* = (p × b - q) / b
 ```
-Where `p` = win probability (confidence), `b` = win/loss ratio (take-profit / stop-loss).
-Default: **half-Kelly** (`KELLY_FRACTION = 0.5`) — retains growth benefit while cutting volatility. Capped at `MAX_POSITION_SIZE` (15%).
+Default: **half-Kelly** (`KELLY_FRACTION = 0.5`). Capped at `MAX_POSITION_SIZE` (15%).
+
+---
+
+## Docker Deployment
+
+Stratex ships with a full Docker setup. The entire system runs in isolated containers that work identically on any machine or cloud server.
+
+### Services
+
+| Service | Description | Port |
+|---|---|---|
+| `stratex_engine` | Live trading engine — runs 24/7 | — |
+| `stratex_dashboard` | Streamlit dashboard | 8501 |
+| `stratex_api` | REST API layer (coming soon) | 8000 |
+
+All three share `./data`, `./logs`, and `./risk/reports` on your real disk via volume mounts.
+
+### Quick Start
+
+```bash
+# 1. Copy environment template
+cp .env.example .env
+# Fill in your API keys in .env
+
+# 2. Create log files (required on first run — Fedora/SELinux note below)
+mkdir -p logs data risk/reports
+touch logs/system.log logs/trades.log logs/errors.log \
+      logs/risk.log logs/strategies.log logs/data_fetch.log
+
+# 3. Build the containers (~5 minutes first time)
+docker compose build
+
+# 4. Start all services
+docker compose up
+
+# Open your browser → http://localhost:8501
+```
+
+> **Fedora / SELinux users:** The volume mounts in `docker-compose.yml` use the `:z` flag (`./logs:/app/logs:z`) which tells SELinux to allow Docker access. This is already configured in the provided `docker-compose.yml`.
+
+### Common Commands
+
+```bash
+# Start in background
+docker compose up -d
+
+# View live logs
+docker compose logs -f
+
+# View one service only
+docker compose logs -f stratex_engine
+
+# Stop everything
+docker compose down
+
+# Rebuild after code changes
+docker compose build --no-cache && docker compose up
+
+# Open a shell inside a container (for debugging)
+docker exec -it stratex_engine bash
+```
+
+### Deploying to a Cloud Server
+
+```bash
+# On your VPS (DigitalOcean, AWS, Hetzner, etc.)
+curl -fsSL https://get.docker.com | sh
+
+git clone https://github.com/mehdibounouif/Quant_firm.git
+cd Quant_firm
+
+cp .env.example .env && nano .env
+
+mkdir -p logs data risk/reports
+touch logs/system.log logs/trades.log logs/errors.log \
+      logs/risk.log logs/strategies.log logs/data_fetch.log
+
+docker compose build
+docker compose up -d
+```
+
+Dashboard accessible at `http://YOUR_SERVER_IP:8501`.
 
 ---
 
@@ -220,21 +378,25 @@ Default: **half-Kelly** (`KELLY_FRACTION = 0.5`) — retains growth benefit whil
 Quant_firm/
 │
 ├── main.py                         # Entry point — CLI flags and interactive menu
-├── logger.py                       # Centralized logging (system, trades, errors, data, risk)
+├── logger.py                       # Centralized logging
 ├── requirements.txt                # Dependencies
+├── Dockerfile                      # Container build instructions
+├── docker-compose.yml              # Multi-service orchestration
+├── .env.example                    # Environment variable template
+├── .dockerignore                   # Files excluded from Docker image
 │
 ├── config/
-│   ├── base_config.py              # Environment, API keys, paths, logging config
-│   ├── trading_config.py           # Capital, watchlist, strategy, sizing, paper trading
+│   ├── base_config.py              # Environment, API keys, paths
+│   ├── trading_config.py           # Capital, watchlist, strategy, sizing
 │   └── risk_config.py              # All hard risk limits
 │
 ├── data/
-│   ├── data_engineer.py            # Central data facade (cache-first, API fallback)
+│   ├── data_engineer.py            # Central data facade (cache-first)
 │   ├── database.py                 # SQLite — prices, fundamentals, news
-│   ├── stock_fetcher.py            # yfinance wrapper with retry and cleaning
+│   ├── stock_fetcher.py            # yfinance wrapper with retry
 │   ├── fundamental_fetcher.py      # Alpha Vantage fundamentals
 │   ├── news_fetcher.py             # Alpha Vantage news
-│   ├── retry.py                    # Retry decorator and fetch_with_retry utility
+│   ├── retry.py                    # Retry decorator
 │   ├── health_check.py             # Data pipeline health monitoring
 │   └── pipelines/
 │       ├── data_cleaning.py        # OHLCV validation and cleaning
@@ -242,384 +404,209 @@ Quant_firm/
 │       └── weekly_update_fundamentals.py
 │
 ├── strategies/
-│   ├── base_strategy.py            # Abstract base + signal contract + _validate()
-│   ├── strategy_researcher.py      # Strategy registry and analysis engine
+│   ├── base_strategy.py            # Abstract base + signal contract
+│   ├── strategy_researcher.py      # Strategy registry
 │   ├── rsi_strategy.py             # RSI Mean Reversion
 │   ├── momentum_strategy.py        # Multi-indicator Momentum
 │   ├── mean_reversion_strategy.py  # Bollinger Bands + Z-Score
-│   └── pairs_strategy.py           # Statistical Arbitrage (Pairs Trading)
+│   └── pairs_strategy.py           # Statistical Arbitrage
 │
 ├── system/
 │   ├── system_architect.py         # TradingSystem — central orchestrator
 │   ├── signal_aggregator.py        # Multi-signal conflict resolution
-│   ├── backtest_engine.py          # Historical simulation with fill models
-│   ├── live_engine.py              # APScheduler cron jobs (pre-market, open, close)
+│   ├── backtest_engine.py          # Historical simulation
+│   ├── walk_forward_optimizer.py   # Rolling-window parameter optimization ← NEW
+│   ├── live_engine.py              # APScheduler cron jobs
 │   ├── market_calendar.py          # NYSE trading day checker
-│   └── tradingagents_integration.py # Optional GPT signal layer
+│   └── tradingagents_integration.py
 │
 ├── risk/
-│   ├── risk_manager.py             # 6-check gate before every trade
-│   ├── position_sizer.py           # Fixed fractional and Kelly Criterion
-│   ├── trade_audit.py              # JSONL audit trail for every decision
+│   ├── risk_manager.py             # 6-check gate
+│   ├── position_sizer.py           # Fixed fractional and Kelly
+│   ├── trade_audit.py              # JSONL audit trail
 │   └── portfolio/
-│       ├── portfolio_tracker.py    # Positions, cash, P&L (persisted to CSV)
-│       └── portfolio_calculator.py # Sector, beta, correlation, Sharpe, VaR
+│       ├── portfolio_tracker.py    # Positions, cash, P&L
+│       └── portfolio_calculator.py # Sharpe, beta, correlation, VaR
 │
 ├── execution/
-│   ├── alpaca_gateway.py           # Alpaca paper/live broker gateway
+│   ├── alpaca_gateway.py           # Alpaca broker gateway
 │   └── fill_models.py              # Slippage and commission simulation
 │
 ├── dashboard/
-│   ├── app.py                      # Streamlit dashboard entry point
-│   └── components.py               # KPI cards, charts, heatmaps, export buttons
+│   ├── app.py                      # Streamlit dashboard
+│   └── components.py               # KPI cards, charts, heatmaps
 │
-├── docs/                           # Research notes — strategies, risk metrics, terms
+├── scripts/
+│   └── start.sh                    # Docker container startup script ← NEW
+│
+├── optimization_results/           # WFO output JSON files (auto-generated) ← NEW
+├── logs/                           # Runtime log files
+├── docs/                           # Research notes
 ├── test/                           # pytest test suite
-└── tradingagents/                  # Embedded MIT TradingAgents subproject (optional AI)
+└── tradingagents/                  # Optional AI subproject
 ```
 
 ---
 
 ## Getting Started
 
-### Prerequisites
-
-- Python 3.10+
-- Git
-
-### Installation
+### Local (Python)
 
 ```bash
-# 1. Clone the repository
 git clone https://github.com/mehdibounouif/Quant_firm.git
 cd Quant_firm
 
-# 2. Create and activate a virtual environment
 python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
 
-# Mac / Linux
-source venv/bin/activate
-
-# Windows
-venv\Scripts\activate
-
-# 3. Install dependencies
 pip install -r requirements.txt
+
+cp .env.example .env            # fill in your keys
+python main.py
 ```
 
-### Environment Setup
+### Docker
 
-```bash
-cp .env.example .env
-```
-
-Open `.env` and fill in your keys:
-
-```env
-# Required for live trading
-ALPACA_API_KEY=your_alpaca_api_key
-ALPACA_SECRET_KEY=your_alpaca_secret_key
-ALPACA_BASE_URL=https://paper-api.alpaca.markets   # Use paper URL for testing
-
-# Optional — fundamentals and news data
-ALPHA_VANTAGE_API_KEY=your_alpha_vantage_key
-
-# Optional — AI signal layer (only if USE_TRADING_AGENT=True in trading_config.py)
-OPENAI_API_KEY=your_openai_api_key
-
-# System
-ENVIRONMENT=development
-DEBUG=True
-DATABASE_URL=sqlite:///data/trading_data.db
-```
-
-> **Note:** The system runs fully without Alpaca, Alpha Vantage, or OpenAI keys. Price data from yfinance requires no key. You will receive warnings in the logs for missing optional keys — these are safe to ignore during development.
-
-
-**Workflow:**
-```bash
-# Always pull before starting work
-git pull origin development
-
-# Work on your branch
-git checkout system   # or risk / data
-
-# Merge into development (never push directly to main)
-git checkout development
-git pull origin development
-git merge system
-git push origin development
-```
-
-
+See [Docker Deployment](#docker-deployment) above.
 
 ---
 
 ## Configuration
 
-All configuration is centralized in three files under `/config`. No magic strings anywhere else.
-
 ### `config/trading_config.py`
 
 ```python
-INITIAL_CAPITAL        = 20000          # Starting portfolio value ($)
-DEFAULT_WATCHLIST      = ['AAPL', 'MSFT', 'NVDA', ...]
+INITIAL_CAPITAL        = 100000
 DEFAULT_STRATEGY       = 'rsi_mean_reversion'
-MIN_SIGNAL_CONFIDENCE  = 0.55           # Minimum confidence to act (0.0–1.0)
-POSITION_SIZE_PCT      = 0.05           # 5% of portfolio per trade
-POSITION_SIZING_METHOD = 'fixed_fractional'  # or 'kelly'
-KELLY_FRACTION         = 0.5            # Half-Kelly (conservative)
-USE_PAPER_TRADING      = True           # Always start with paper trading
-USE_TRADING_AGENT      = False          # Enable GPT signal layer
-TRADINGAGENTS_MODEL    = 'gpt-4o-mini'
+MIN_SIGNAL_CONFIDENCE  = 0.55
+POSITION_SIZE_PCT      = 0.05
+POSITION_SIZING_METHOD = 'fixed_fractional'   # or 'kelly'
+KELLY_FRACTION         = 0.5
+USE_PAPER_TRADING      = True
+USE_TRADING_AGENT      = False
 ```
 
 ### `config/risk_config.py`
 
 ```python
-MAX_POSITION_SIZE         = 0.15   # 15% max per stock
-MIN_CASH_RESERVE          = 0.10   # Keep 10% cash always
-MAX_TOTAL_POSITIONS       = 15     # Max simultaneous positions
-MAX_DAILY_LOSS            = 0.03   # 3% daily loss circuit breaker
-MAX_DRAWDOWN_BEFORE_HALT  = 0.15   # 15% max drawdown — halts all trading
-DEFAULT_STOP_LOSS_PCT     = 0.05   # 5% stop-loss per trade
-DEFAULT_TAKE_PROFIT_PCT   = 0.10   # 10% take-profit per trade
-MIN_SHARPE_RATIO          = 1.0
-MAX_PORTFOLIO_BETA        = 1.5
-MAX_CORRELATION           = 0.80
+MAX_POSITION_SIZE         = 0.15
+MIN_CASH_RESERVE          = 0.10
+MAX_TOTAL_POSITIONS       = 15
+MAX_DAILY_LOSS            = 0.03
+MAX_DRAWDOWN_BEFORE_HALT  = 0.15
+DEFAULT_STOP_LOSS_PCT     = 0.05
+DEFAULT_TAKE_PROFIT_PCT   = 0.10
 ```
 
 ---
 
 ## Usage
 
-### Interactive Mode (recommended for first run)
-
 ```bash
+# Interactive menu
 python main.py
-```
 
-```
---- Quant_firm Interactive ---
-1. Analyze Ticker
-2. Scan Watchlist
-3. Run Daily Analysis
-4. Exit
-Option:
-```
-
-### Command Line Flags
-
-```bash
-# Run a backtest on AAPL using the default strategy
+# Backtest
 python main.py --backtest AAPL 2024-01-01 2024-12-31
-
-# Run a backtest with a specific strategy
 python main.py --backtest NVDA 2024-01-01 2024-12-31 --strategy momentum
 
-# Launch the Streamlit dashboard
+# Walk-forward optimization
+python main.py --optimize AAPL 2023-01-01 2024-12-31
+
+# Dashboard
 python main.py --dashboard
 
-# Start the live trading engine (paper trading by default)
+# Live trading (paper mode)
 python main.py --live
-```
-
-### Available Strategy Names
-
-| Flag value | Strategy |
-|---|---|
-| `rsi_mean_reversion` | RSI Mean Reversion (default) |
-| `momentum` | Multi-indicator Momentum |
-| `mean_reversion` | Bollinger Bands + Z-Score |
-
-### Backtest Output Example
-
-```
-=============================================
- BACKTEST: AAPL | RSI Mean Reversion
-=============================================
-Initial Capital:  $20,000.00
-Final Value:      $24,830.00
-Total Return:     24.15%
-Max Drawdown:     -8.42%
-Total Trades:     37
-Commissions:      $12.45
-Slippage Cost:    $23.80
-=============================================
 ```
 
 ---
 
 ## Dashboard
 
-Launch the Streamlit dashboard:
-
 ```bash
 python main.py --dashboard
-# or directly:
-streamlit run dashboard/app.py
+# or via Docker:
+docker compose up dashboard
+# → http://localhost:8501
 ```
 
-The dashboard provides:
-
-- **Portfolio KPIs** — total value, cash balance, realized/unrealized P&L, return %
-- **Risk metrics** — current drawdown, daily loss, portfolio beta, Sharpe ratio
-- **Open positions** — real-time position table with entry price, current price, P&L
-- **Strategy heatmap** — signal history across all tickers and strategies
-- **Order history** — full list of executed trades with reasoning
-- **System health** — data pipeline status, last update timestamps
-- **Export buttons** — download portfolio report and audit log as CSV
-
-The dashboard auto-refreshes every 60 seconds during market hours.
+- Portfolio KPIs — total value, cash, P&L, return %
+- Risk metrics — drawdown, daily loss, beta, Sharpe
+- Open positions with entry price, current price, P&L
+- Strategy heatmap across all tickers
+- Full order history with reasoning
+- CSV export for portfolio report and audit log
 
 ---
 
 ## Backtesting
 
-The backtest engine simulates realistic trading with:
-
-- **Slippage model:** Percentage-based (10 basis points default)
-- **Commission model:** Per-share ($0.005/share default)
-- **Fill simulation:** Configurable via `FillSimulator`
-- **Isolated portfolio:** Backtests never touch live portfolio data
-- **Multi-strategy support:** Run all strategies simultaneously with signal aggregation
-
 ```python
 from system.backtest_engine import BacktestEngine
 from strategies.rsi_strategy import rsi_strategy
 
-engine = BacktestEngine(rsi_strategy, initial_capital=20000)
+engine = BacktestEngine(rsi_strategy, initial_capital=100000)
 results = engine.run('AAPL', '2024-01-01', '2024-12-31')
 ```
 
-Customize fill simulation:
-
-```python
-# config/trading_config.py
-BACKTEST_SLIPPAGE_MODEL    = 'percentage'   # 'percentage' | 'fixed' | 'volume_based'
-BACKTEST_SLIPPAGE_VALUE    = 0.001          # 10 bps
-BACKTEST_COMMISSION_MODEL  = 'per_share'    # 'per_share' | 'percentage' | 'flat'
-BACKTEST_COMMISSION_RATE   = 0.005          # $0.005 per share
-```
+Includes slippage (10bps), commission ($0.005/share), isolated portfolio, and fill simulation.
 
 ---
 
 ## Live Trading
 
-> **Important:** Always start with paper trading (`USE_PAPER_TRADING = True` in `trading_config.py`). Never switch to live capital without extensive backtesting.
+> Always start with paper trading. Never use live capital without extensive backtesting and walk-forward validation.
 
-The live engine uses **APScheduler** with four scheduled jobs:
+**APScheduler jobs:**
 
-| Time (NY) | Job | Description |
-|---|---|---|
-| 09:00 AM | Pre-market | Warms data cache for all watchlist tickers |
-| 09:35 AM | Market open | Runs full watchlist scan, generates and executes signals |
-| 12:30 PM | Mid-day | Checks stop-losses, updates position prices |
-| 03:55 PM | Market close | Saves daily report, logs performance summary |
+| Time (NY) | Job |
+|---|---|
+| 09:00 AM | Pre-market cache warm-up |
+| 09:35 AM | Full watchlist scan + signal execution |
+| 12:30 PM | Stop-loss checks + price updates |
+| 03:55 PM | Daily report + performance summary |
 
-The system automatically skips non-trading days via `market_calendar.py`.
-
-**Alpaca paper trading setup:**
-1. Create a free account at [alpaca.markets](https://alpaca.markets)
-2. Generate paper trading API keys from the dashboard
-3. Add them to your `.env` file
-4. Set `USE_PAPER_TRADING = True`
-5. Run `python main.py --live`
+**Setup:** Create a free [Alpaca](https://alpaca.markets) account → generate paper trading keys → add to `.env` → `python main.py --live`
 
 ---
 
 ## Data Layer
 
-The data layer uses a **cache-first architecture** — strategies always receive clean, validated data with no API latency.
-
-```
-Strategy requests data
-        ↓
-Check SQLite cache (< 1 day old?)
-        ↓ YES                    ↓ NO
-Return cached data        Fetch from yfinance
-                                ↓
-                          Clean & validate (DataCleaner)
-                                ↓
-                          Save to SQLite cache
-                                ↓
-                          Return clean DataFrame
-```
-
-**Available data access methods:**
+Cache-first architecture — strategies always receive clean, validated data with no API latency.
 
 ```python
 from data.data_engineer import data_access
 
-# Price history (OHLCV DataFrame)
-df = data_access.get_price_history('AAPL', days=90)
-
-# Latest price (float)
+df    = data_access.get_price_history('AAPL', days=90)
 price = data_access.get_latest_price('AAPL')
-
-# Multiple tickers at once (dict of DataFrames)
-data = data_access.get_multiple_stocks(['AAPL', 'MSFT', 'NVDA'], days=60)
-
-# Fundamentals (requires Alpha Vantage key)
-fundamentals = data_access.get_fundamentals('AAPL')
-
-# News (requires Alpha Vantage key)
-news = data_access.get_news('AAPL', days=7)
+data  = data_access.get_multiple_stocks(['AAPL', 'MSFT'], days=60)
 ```
-
-**Data cleaning pipeline** (`data/pipelines/data_cleaning.py`):
-- Removes duplicate rows and NaN OHLCV values
-- Validates price consistency (Open/High/Low/Close ranges)
-- Detects and handles outliers
-- Ensures minimum data requirements are met before strategies receive the DataFrame
 
 ---
 
 ## Testing
 
-The project uses **pytest** with a full test suite covering all major components.
-
 ```bash
-# Run all tests
 pytest
-
-# Run with coverage report
 pytest --cov=. --cov-report=term-missing
-
-# Run a specific test file
 pytest test/test_risk_manger.py -v
-pytest test/test_momentum_strategy.py -v
-pytest test/test_portfolio_tracker.py -v
 ```
-
-**Test coverage includes:**
-- `test_data_cleaning.py` — DataCleaner edge cases
-- `test_database.py` — SQLite CRUD and cache logic
-- `test_momentum_strategy.py` — Signal generation for all market conditions
-- `test_portfolio_calculator.py` — Sharpe, beta, correlation, VaR calculations
-- `test_portfolio_tracker.py` — Position management and P&L tracking
-- `test_position_sizer.py` — Fixed fractional and Kelly sizing math
-- `test_risk_manger.py` — All 6 risk checks, including circuit breaker behavior
-- `test_rsi_strategy.py` — RSI calculation and signal generation
-- `test_trade_audit.py` — JSONL write/read and audit trail integrity
-- `test_system.py` — End-to-end orchestration smoke tests
 
 ---
 
 ## Logging
 
-The system writes to six separate log files under `/logs/`:
-
 | File | Contents |
 |---|---|
-| `logs/system.log` | General application activity |
-| `logs/trades.log` | Trade execution events only |
-| `logs/errors.log` | Errors and exceptions only |
+| `logs/system.log` | General activity |
+| `logs/trades.log` | Trade execution events |
+| `logs/errors.log` | Errors and exceptions |
 | `logs/data_fetch.log` | Data pipeline operations |
-| `logs/strategies.log` | Strategy signal generation |
-| `logs/risk.log` | Risk check results per trade |
+| `logs/strategies.log` | Signal generation |
+| `logs/risk.log` | Risk check results |
 
-Log rotation: 10MB per file, 5 backup files kept.
+Log rotation: 10MB per file, 5 backups kept.
 
 ---
 
@@ -628,10 +615,9 @@ Log rotation: 10MB per file, 5 backup files kept.
 | Name | Role | Branch |
 |---|---|---|
 | **Mehdi Bounouif** | System Architect | `system` |
-| **Kawtar bouarfa** | Risk Manager | `risk` |
-| **Abdlilah afahmi** | Data Engineer | `data` |
+| **Kawtar Bouarfa** | Risk Manager | `risk` |
+| **Abdilah Afahmi** | Data Engineer | `data` |
 
 ---
 
-
-*Created by - Mehdi-bounouif - Abdlilah afahmi - Kawtar bouarfa*
+*Stratex — Built by Mehdi Bounouif, Kawtar Bouarfa, Abdilah Afahmi*
