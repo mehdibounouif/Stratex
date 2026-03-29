@@ -31,7 +31,7 @@ from strategies.strategy_researcher import strategy_engine
 from execution.alpaca_gateway import alpaca_gateway
 
 st.set_page_config(
-    page_title="Quant_firm | Dashboard", 
+    page_title="Startex | Dashboard", 
     layout="wide", 
     page_icon="📈",
     initial_sidebar_state="expanded"
@@ -106,7 +106,7 @@ def load_orders():
 # --- Sidebar ---
 
 with st.sidebar:
-    st.markdown("# 📈 QUANT FIRM")
+    st.markdown("# 📈 Startex")
     st.markdown("---")
     page = st.radio("MAIN NAVIGATION", [
         "🏠 Overview", 
@@ -117,10 +117,10 @@ with st.sidebar:
         "⚙️ Settings",
         "🧪 Sandbox"
     ])
-    st.markdown("---")
-    refresh_rate = st.select_slider("REFRESH (SEC)", options=[10, 30, 60, 300], value=60)
-    st_autorefresh(interval=refresh_rate * 1000, key="data_refresh")
-    st.markdown("---")
+#    st.markdown("---")
+#    refresh_rate = st.select_slider("REFRESH (SEC)", options=[10, 30, 60, 300], value=60)
+#    st_autorefresh(interval=refresh_rate * 1000, key="data_refresh")
+#    st.markdown("---")
     st.caption(f"v1.2.0 | {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
 # --- Global Data ---
