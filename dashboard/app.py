@@ -120,7 +120,7 @@ with st.sidebar:
 #    st.markdown("---")
 #    refresh_rate = st.select_slider("REFRESH (SEC)", options=[10, 30, 60, 300], value=60)
 #    st_autorefresh(interval=refresh_rate * 1000, key="data_refresh")
-#    st.markdown("---")
+    st.markdown("---")
     st.caption(f"v1.2.0 | {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
 # --- Global Data ---
