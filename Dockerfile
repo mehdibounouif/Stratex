@@ -9,6 +9,8 @@ ENV APP_HOME /app
 # Set working directory
 WORKDIR $APP_HOME
 
+ENV PYTHONPATH=/app
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
@@ -30,8 +32,10 @@ RUN mkdir -p logs data risk/reports \
     && chmod +x scripts/start.sh
 
 # Create a non-root user for security
-RUN useradd -m stratex && chown -R stratex:stratex $APP_HOME
-USER stratex
+# RUN useradd -m stratex && chown -R stratex:stratex $APP_HOME
+# RUN mkdir -p /app/logs /app/data /app/risk/reports \
+#     && chown -R stratex:stratex /app/logs /app/data /app/risk/reports
+# USER stratex
 
 # Default command (can be overridden in docker-compose)
 CMD ["python", "main.py", "--live"]

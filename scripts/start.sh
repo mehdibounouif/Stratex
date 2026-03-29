@@ -8,7 +8,7 @@ mkdir -p data logs risk/reports
 # Check if the SQLite file exists or run a setup script
 if [ ! -f "data/trading.db" ]; then
     echo "First run: Initializing database..."
-    python -c "from data.database import init_db; init_db()"
+    python -c "from data.database import Database; Database().create_tables()"
 fi
 
 # Execute the command passed to the script

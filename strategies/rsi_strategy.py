@@ -17,7 +17,7 @@ class RSIStrategy(BaseStrategy):
     Sell when RSI > 75 (overbought) OR 5 days passed OR -5% stop loss
     """
     
-    def __init__(self, rsi_buy=25, rsi_sell=75, holding_days=5, stop_loss=0.05):
+    def __init__(self, rsi_buy=30, rsi_sell=70, holding_days=3, stop_loss=0.03):
         self.rsi_buy     = rsi_buy
         self.rsi_sell    = rsi_sell
         self.holding_days = holding_days
