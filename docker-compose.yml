@@ -6,9 +6,9 @@ services:
     env_file:
       - .env
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./risk/reports:/app/risk/reports
+      - ./data:/app/data:z
+      - ./logs:/app/logs:z
+      - ./risk/reports:/app/risk/reports:z
     restart: unless-stopped
     command: ["./scripts/start.sh", "python", "main.py", "--live"]
 
@@ -20,10 +20,13 @@ services:
       - "8501:8501"
     env_file:
       - .env
+    environment:
+      - WATCHDOG_LOGGING_LEVEL=WARNING
+      - STREAMLIT_LOGGER_LEVEL=WARNING
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./risk/reports:/app/risk/reports
+      - ./data:/app/data:z
+      - ./logs:/app/logs:z
+      - ./risk/reports:/app/risk/reports:z
     restart: unless-stopped
     command: ["./scripts/start.sh", "streamlit", "run", "dashboard/app.py", "--server.port", "8501", "--server.address", "0.0.0.0"]
 
