@@ -15,6 +15,7 @@ Author: Kawtar (Risk Manager)
 from config import RiskConfig, TradingConfig
 from logger import get_logger
 from decimal import Decimal
+from system.alert_manager import alert_manager
 
 log = get_logger("risk.risk_manager")
 
@@ -353,9 +354,17 @@ class RiskManager:
             limit = -self.config.MAX_DAILY_LOSS  # negative = loss
 
             if daily_loss_pct < limit:
-                return False, (
-                    f"Daily loss {daily_loss_pct:.1%} exceeds {self.config.MAX_DAILY_LOSS:.0%} limit — CIRCUIT BREAKER"
+                msg = f"Daily loss {daily_loss_pct:.1%} exceeds {self.config.MAX_DAILY_LOSS:.0%} limit — CIRCUIT BREAKER"
+                alert_manager.send(
+                    subject="Circuit breaker — daily loss limit hit",
+                    body=(
+                        f"Daily loss: {daily_loss_pct:.1%}\n"
+                        f"Limit: {self.config.MAX_DAILY_LOSS:.0%}\n"
+                        f"All trading halted for today."
+                    ),
+                    level="critical"
                 )
+                return False, msg
             return True, f"Daily P&L: {daily_loss_pct:+.1%}  ✓"
 
         except Exception as e:
@@ -372,6 +381,15 @@ class RiskManager:
             limit       = self.config.MAX_DRAWDOWN_BEFORE_HALT
 
             if max_dd > limit:
+                alert_manager.send(
+                    subject="Circuit breaker — max drawdown hit",
+                    body=(
+                        f"Current drawdown: {current_drawdown:.1%}\n"
+                        f"Limit: {self.config.MAX_DRAWDOWN_BEFORE_HALT:.0%}\n"
+                        f"All trading halted."
+                    ),
+                    level="critical"
+                )
                 return False, (
                     f"Drawdown {max_dd:.1f}% exceeds {limit:.0f}% halt limit — TRADING HALTED"
                 )

@@ -39,6 +39,7 @@ from risk.position_sizer import PositionSizer
 from risk.trade_audit import trade_audit
 from system.signal_aggregator import SignalAggregator
 from logger import  get_logger
+from system.alert_manager import alert_manager
 
 log = get_logger('system.system_architect')
 
@@ -568,6 +569,18 @@ class TradingSystem:
                 quantity=quantity, price=current_price,
                 signal=signal, approval=approval, sizing=sizing,
             )
+            # ── Alert ──────────────────────────────────────────
+            alert_manager.send(
+                subject=f"BUY executed — {ticker}",
+                body=(
+                    f"Shares: {quantity}\n"
+                    f"Price: ${current_price:.2f}\n"
+                    f"Value: ${quantity * current_price:,.2f}\n"
+                    f"Confidence: {confidence:.0%}\n"
+                    f"Reason: {signal.get('reasoning', '')}"
+                ),
+                level="trade"
+            )
             return {
                 'ticker':    ticker,
                 'action':    'BUY',
@@ -675,6 +688,19 @@ class TradingSystem:
                 quantity=int(qty), price=current_price,
                 signal=signal, approval=approval,
                 realized_pnl=pnl,
+            )
+            # ── Alert ──────────────────────────────────────────
+            pnl_emoji = "🟢" if pnl >= 0 else "🔴"
+            alert_manager.send(
+                subject=f"SELL executed — {ticker}",
+                body=(
+                    f"Shares: {qty:.0f}\n"
+                    f"Price: ${current_price:.2f}\n"
+                    f"Realized P&L: {pnl_emoji} ${pnl:+,.2f}\n"
+                    f"Confidence: {confidence:.0%}\n"
+                    f"Reason: {signal.get('reasoning', '')}"
+                ),
+                level="trade"
             )
             return {
                 'ticker':       ticker,
