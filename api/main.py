@@ -77,8 +77,6 @@ class BacktestRequest(BaseModel):
 @app.post("/backtest")
 def run_backtest(req: BacktestRequest):
     try:
-        # BUG FIX 2: BacktestEngine takes a strategy INSTANCE, not a strategy name string.
-        # Resolve the name → instance via strategy_engine registry first.
         strategy = strategy_engine.strategies.get(req.strategy)
         if not strategy:
             raise HTTPException(

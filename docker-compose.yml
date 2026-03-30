@@ -1,4 +1,5 @@
 services:
+
   # 1. Main Trading Engine
   stratex:
     build: .
@@ -9,6 +10,7 @@ services:
       - ./data:/app/data:z
       - ./logs:/app/logs:z
       - ./risk/reports:/app/risk/reports:z
+      - ./optimization_results:/app/optimization_results:z
     restart: unless-stopped
     command: ["./scripts/start.sh", "python", "main.py", "--live"]
 
@@ -31,16 +33,17 @@ services:
     command: ["./scripts/start.sh", "streamlit", "run", "dashboard/app.py", "--server.port", "8501", "--server.address", "0.0.0.0"]
 
   # 3. REST API Server
-  # api:
-  #   build: .
-  #   container_name: stratex_api
-  #   ports:
-  #     - "8000:8000"
-  #   env_file:
-  #     - .env
-  #   volumes:
-  #     - ./data:/app/data
-  #     - ./logs:/app/logs
-  #     - ./risk/reports:/app/risk/reports
-  #   restart: unless-stopped
-  #   command: ["./scripts/start.sh", "python", "main.py", "--api"]
+  api:
+    build: .
+    container_name: stratex_api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data:z
+      - ./logs:/app/logs:z
+      - ./risk/reports:/app/risk/reports:z
+      - ./optimization_results:/app/optimization_results:z
+    restart: unless-stopped
+    command: ["./scripts/start.sh", "python", "main.py", "--api"]
