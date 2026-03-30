@@ -6,6 +6,7 @@ import argparse
 import sys
 import subprocess
 from logger import get_logger, setup_logging
+import uvicorn
 from config.trading_config import TradingConfig
 
 setup_logging()
@@ -104,6 +105,7 @@ def interactive_menu():
 def main():
     parser = argparse.ArgumentParser(description="Quant_firm Trading")
     parser.add_argument('--live', action='store_true')
+    parser.add_argument('--api', action='store_true')
     parser.add_argument('--backtest', nargs=3, metavar=('TICKER', 'START', 'END'))
     parser.add_argument('--strategy', default=TradingConfig.DEFAULT_STRATEGY)
     parser.add_argument('--dashboard', action='store_true')
@@ -121,6 +123,8 @@ def main():
             run_backtest(args.backtest[0], args.backtest[1], args.backtest[2], args.strategy)
         elif args.dashboard:
             run_dashboard()
+        elif args.api:
+            uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
         else:
             interactive_menu()
     except KeyboardInterrupt:

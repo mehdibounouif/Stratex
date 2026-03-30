@@ -236,3 +236,61 @@ if __name__ == '__main__':
 
     # Save signal
     rsi_strategy.save_signal(signal)
+
+def load_wfo_params(strategy_instance=None, results_dir="optimization_results"):
+    """
+    Load the most recent Walk-Forward Optimization consensus params
+    and apply them to the live rsi_strategy singleton.
+
+    Called automatically at module load time if WFO results exist.
+    Can also be called manually:
+        from strategies.rsi_strategy import load_wfo_params
+        load_wfo_params()
+
+    Returns:
+        dict: The consensus params that were applied, or None if no results found.
+    """
+    import glob
+
+    if strategy_instance is None:
+        strategy_instance = rsi_strategy
+
+    pattern = os.path.join(results_dir, "wfo_*.json")
+    files = sorted(glob.glob(pattern))
+
+    if not files:
+        logging.debug("No WFO results found — using default RSI params.")
+        return None
+
+    latest = files[-1]  # most recent by filename timestamp
+
+    try:
+        with open(latest, "r") as f:
+            data = json.load(f)
+
+        params = data.get("summary", {}).get("consensus_params", {})
+
+        if not params:
+            logging.warning(f"WFO file {latest} has no consensus_params — keeping defaults.")
+            return None
+
+        # Apply only params that exist on the strategy instance
+        applied = {}
+        for key, value in params.items():
+            if hasattr(strategy_instance, key):
+                setattr(strategy_instance, key, value)
+                applied[key] = value
+
+        logging.info(
+            f"✅ WFO params loaded from {os.path.basename(latest)}: {applied}"
+        )
+        return applied
+
+    except Exception as e:
+        logging.warning(f"Could not load WFO params from {latest}: {e}")
+        return None
+
+
+# Auto-load WFO consensus params if results exist.
+# Runs once at module import — live singleton always uses latest optimized params.
+load_wfo_params()

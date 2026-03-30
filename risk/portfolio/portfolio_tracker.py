@@ -930,7 +930,7 @@ class PositionTracker:
 # ══════════════════════════════════════════════════════════════
 
 position_tracker = PositionTracker()
-
+portfolio_tracker = position_tracker   # alias — API imports this name
 
 # ══════════════════════════════════════════════════════════════
 # STANDALONE TEST
