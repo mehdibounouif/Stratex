@@ -6,7 +6,6 @@ import argparse
 import sys
 import subprocess
 from logger import get_logger, setup_logging
-import uvicorn
 from config.trading_config import TradingConfig
 
 setup_logging()
@@ -124,7 +123,14 @@ def main():
         elif args.dashboard:
             run_dashboard()
         elif args.api:
-            uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
+            import os
+            import uvicorn
+            uvicorn.run(
+                "api.main:app",
+                host=os.getenv("API_HOST", "0.0.0.0"),
+                port=int(os.getenv("API_PORT", 8000)),
+                reload=True
+            )
         else:
             interactive_menu()
     except KeyboardInterrupt:
