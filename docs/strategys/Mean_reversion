@@ -1,0 +1,602 @@
+normally mean reversion says that prices that moves up or down their avaerage
+are more likely to snap back to their mean
+
+it is computed using many indicators
+
+═══════════════════════════════════
+1. Bollinger Bands + Z-Score       |
+═══════════════════════════════════
+1 - bollinger bands
+
+this bands kinda show you where the price is placed based on SMA & STD
+--> the price moving average and volatilty can determine like a range 
+FORMULA:
+══════════════════════════════════════════════════════════════
+ 
+  SMA        = average of last 20 closing prices
+  STD        = standard deviation of last 20 closing prices
+ 
+    upper band = SMA + (k * STD) ← abnormally high zone
+    lower band = SMA - (k * STD) ← abnormally low zone
+    > where k is the number of stds you move away from the SMA to compute the band
+ 
+══════════════════════════════════════════════════════════════
+
+-->as a result you get two bands and the price of today lives between them
+    > if the price is near upper band it's overbought --> it will go back dowm
+    > if the price is near lower band it's oversold --> it will go back up
+
+2 - Z-score 
+
+then comes the z score to tell you how strong that move is :
+it uses STD to tell you based on the fluctuation of the price how far the price is from the mean
+
+z = (price of today - SMA )/ STD
+                    ↑
+          how many standard deviations away from average
+
+we have a treshold of 1.5 z_score 
+
+if z < treshold it is oversold
+if z > treshold it is overbought
+if it crossed 0 between yesterday and today then prices went back to their mean already you exit immediatly
+
+Bollinger Bands + Z-Score answer ONE question:
+    "How far is the price from its average, and is it extreme enough to act?"
+They tell you: whether the price has moved into an abnormal zone
+               AND exactly how extreme the deviation is.
+BUY when:
+    price <= Lower_band   AND   Z < -1.5
+Meaning:
+Price is at bottom extreme (BB)
+AND far below mean (Z-score)
+
+SELL when:
+    price >= Upper_band   AND   Z > 1.5
+Meaning:
+Price is at top extreme
+AND far above mean
+
+z_strong is a boost of confidence and prove the strength of the move 
+--> treshold is 2 if z_score went beyond it up or down boost the confidence 
+
+| |Z| range              | Confidence      | Explanation                   |
+  | :------------------- | :-------------- | :---------------------------- |
+  | |Z| ≤ 1.5             | 0.55 (floor)    | at threshold, minimum strength|
+  | 1.5 < |Z| ≤ 2.2       | 0.55 → 0.80     | linear ramp as Z grows        |
+  | |Z| > 2.2             | 0.80 → 0.88     | strong boost, capped at 0.88  |
+
+
+══════════════════════════════════════════════════════════════
+GOLDEN RULE
+ 
+  Z below −1.5 + price below Lower Band → oversold   → BUY
+  Z above +1.5 + price above Upper Band → overbought → SELL
+  Z between −1.5 and +1.5              → neutral    → HOLD
+ 
+  Bands show WHERE the price is.
+  Z-Score shows HOW EXTREME the deviation is.
+  You need BOTH to fire a signal.
+ 
+══════════════════════════════════════════════════════════════
+ 
+
+═══════════════════════════════════════════════
+2. ADX — Average Directional Index             |
+═══════════════════════════════════════════════
+ 
+ADX answers ONE question:
+    "Is the market trending or just bouncing around?"
+ 
+It tells you: whether it is SAFE to trade mean reversion right now.
+ 
+  ADX < 25  → Market is RANGING  → mean reversion is SAFE   ✅
+  ADX ≥ 25  → Market is TRENDING → mean reversion is RISKY  ❌
+ 
+ANALOGY:
+  RANGING market = ping pong ball bouncing between walls → good for reversals
+  TRENDING market = train moving in one direction → don't stand in front of it!
+ 
+══════════════════════════════════════════════════════════════
+ 
+FORMULA:
+══════════════════════════════════════════════════════════════
+ 
+Built in three steps from High, Low, Close prices:
+ 
+  Step A — True Range (TR)
+  ────────────────────────
+  TR = max of:
+    option 1 = High − Low              (today's candle)
+    option 2 = |High − Previous Close| (gap UP overnight)
+    option 3 = |Low  − Previous Close| (gap DOWN overnight)
+ 
+  → TR captures the REAL daily move including overnight gaps.
+ 
+  Step B — Directional Movement (+DM / -DM)
+  ─────────────────────────────────────────
+  up_move   = Today High − Yesterday High
+  down_move = Yesterday Low − Today Low
+ 
+  if up_move > down_move AND up_move > 0:
+      +DM = up_move,  -DM = 0   ← upward day won
+  elif down_move > up_move AND down_move > 0:
+      -DM = down_move, +DM = 0  ← downward day won
+  else:
+      +DM = 0,  -DM = 0         ← no clear direction
+ 
+  Step C — Smooth everything → +DI / -DI → DX → ADX
+  ────────────────────────────────────────────────────
+  alpha = 1 / 14  (Wilder smoothing)
+ 
+  smooth_TR   = ewm(TR,   alpha=1/14)
+  smooth_+DM  = ewm(+DM,  alpha=1/14)
+  smooth_-DM  = ewm(-DM,  alpha=1/14)
+ 
+  +DI = 100 × smooth_+DM / smooth_TR   ← % of range that was upward
+  -DI = 100 × smooth_-DM / smooth_TR   ← % of range that was downward
+ 
+  DX  = 100 × |+DI − -DI| / |+DI + -DI|  ← how DIFFERENT are they?
+ 
+  ADX = ewm(DX, alpha=1/14)                ← final smoothed trend strength
+ 
+══════════════════════════════════════════════════════════════
+
+WORKFLOW (based on your settings):
+Settings in your strategy:
+  adx_period    = 14 days
+  adx_threshold = 25.0
+ 
+──────────────────────────────────────────────────────────────
+Worked example — 3 days shown
+ 
+| Day | High | Low  | Close | TR   | +DM  | -DM  |
+| --: | ---: | ---: | ----: | ---: | ---: | ---: |
+|   1 |  105 |  100 |   102 | 5.00 |  —   |  —   |
+|   2 |  107 |   99 |   103 | 8.00 | 2.00 | 1.00 | ← up_move=2 won
+|   3 |  104 |   96 |   100 | 8.00 | 0.00 | 3.00 | ← down_move=3 won
+ 
+After Wilder smoothing + +DI / -DI calculation:
+  +DI ≈ 18.5
+  -DI ≈ 22.3
+  DX  = 100 × |18.5 − 22.3| / |18.5 + 22.3|
+      = 100 × 3.8 / 40.8
+      ≈ 9.3
+ 
+  ADX = smoothed(DX) over 14 bars → say ADX = 18.0
+ 
+──────────────────────────────────────────────────────────────
+Compare to threshold:
+ 
+  | Condition    | Met?   | Meaning                      |
+  | :----------- | :----- | :--------------------------- |
+  | ADX < 25     | ✅ YES | Market is RANGING → allow    |
+  | ADX ≥ 25     | ❌ NO  | Market is TRENDING → block   |
+ 
+  ADX = 18.0 → below 25 → market is ranging → entry ALLOWED ✅
+ 
+──────────────────────────────────────────────────────────────
+Final ADX summary:
+ 
+  | Metric        | Value  |
+  | :------------ | :----- |
+  | ADX           |  18.0  |
+  | Threshold     |  25.0  |
+  | Market state  | RANGING|
+  | Decision      | ALLOW ✅|
+ 
+══════════════════════════════════════════════════════════════
+GOLDEN RULE
+ 
+  ADX < 25  → market ranging  → mean reversion is safe  → ALLOW
+  ADX ≥ 25  → market trending → fight this, you'll lose → BLOCK
+ 
+══════════════════════════════════════════════════════════════
+ 
+ 
+═══════════════════════════════════════════════
+3. BandWidth & BandWidth_Change                |
+═══════════════════════════════════════════════
+ 
+BandWidth answers ONE question:
+    "Are the Bollinger Bands expanding fast right now?"
+ 
+It tells you: is a big breakout move starting?
+              If yes, mean reversion is dangerous.
+ 
+  BandWidth stable or contracting → mean reversion likely to work   ✅
+  BandWidth expanding rapidly     → breakout starting, don't trade  ❌
+ 
+ANALOGY:
+  Contracting bands = calm before the storm → reversals work
+  Expanding bands   = storm has already arrived → don't trade against it
+ 
+══════════════════════════════════════════════════════════════
+ 
+FORMULA:
+══════════════════════════════════════════════════════════════
+ 
+  BandWidth        = (Upper Band − Lower Band) / SMA
+                          ↑
+              normalized width (removes price scale)
+ 
+  BandWidth_Change = pct_change(BandWidth)
+                          ↑
+              how fast the bands are expanding TODAY vs yesterday
+ 
+  BandWidth_Change ≥ 0.03 (3%) → expanding rapidly → BLOCK entry
+ 
+══════════════════════════════════════════════════════════════
+ 
+WORKFLOW (based on your settings):
+Settings in your strategy:
+  bw_expand_threshold = 0.03  (3% expansion per bar)
+ 
+──────────────────────────────────────────────────────────────
+Worked example
+ 
+  Yesterday:
+    Upper = 104.00, Lower = 97.00, SMA = 100.50
+    BandWidth = (104.00 − 97.00) / 100.50 = 0.0697
+ 
+  Today:
+    Upper = 106.50, Lower = 94.50, SMA = 100.50
+    BandWidth = (106.50 − 94.50) / 100.50 = 0.1194
+ 
+  BandWidth_Change = (0.1194 − 0.0697) / 0.0697
+                   = +71.3%  ← massive expansion!
+ 
+──────────────────────────────────────────────────────────────
+Compare to threshold:
+ 
+  | Condition                      | Met?   | Decision        |
+  | :----------------------------- | :----- | :-------------- |
+  | BandWidth_Change < 0.03 (3%)   | ❌ NO  | ALLOW entry     |
+  | BandWidth_Change ≥ 0.03 (3%)   | ✅ YES | BLOCK entry     |
+ 
+  BandWidth_Change = 71.3% → way above 3% → BLOCK ❌
+ 
+──────────────────────────────────────────────────────────────
+Final BandWidth summary:
+ 
+  | Metric               | Value   |
+  | :------------------- | :------ |
+  | BandWidth yesterday  | 0.0697  |
+  | BandWidth today      | 0.1194  |
+  | BandWidth_Change     | +71.3%  |
+  | Threshold            |   3.0%  |
+  | Decision             | BLOCK ❌|
+ 
+══════════════════════════════════════════════════════════════
+GOLDEN RULE
+ 
+  Bands stable or tightening  → safe to trade reversals → ALLOW
+  Bands exploding outward     → breakout in progress    → BLOCK
+ 
+══════════════════════════════════════════════════════════════
+ 
+ 
+═══════════════════════════════════════════════
+4. Volume (Volume Quiet Filter)                |
+═══════════════════════════════════════════════
+ 
+Volume answers ONE question:
+    "Is today's move backed by strong conviction, or is it just noise?"
+ 
+It tells you: quiet volume = weak move = likely to reverse = ALLOW
+              loud  volume = strong conviction = likely breakout = BLOCK
+ 
+ANALOGY:
+  Quiet volume = a whisper → price move will probably stop
+  Loud  volume = a scream  → price move likely to continue
+ 
+══════════════════════════════════════════════════════════════
+ 
+FORMULA:
+══════════════════════════════════════════════════════════════
+ 
+  volume_threshold = percentile(volume_history, 40)
+                          ↑
+              the volume level that beats only 40% of recent days
+ 
+  if latest_volume <= volume_threshold:
+      volume_quiet = True   → ALLOW entry  ✅
+  else:
+      volume_quiet = False  → BLOCK entry  ❌
+ 
+══════════════════════════════════════════════════════════════
+ 
+WORKFLOW (based on your settings):
+Settings in your strategy:
+  volume_confirm_pctl = 40  (40th percentile)
+ 
+──────────────────────────────────────────────────────────────
+Worked example
+ 
+Recent 10-day volume history (sorted low to high):
+  800K, 850K, 900K, 950K, 1.0M, 1.1M, 1.2M, 1.4M, 1.6M, 2.0M
+ 
+  40th percentile = 950K  (beats 40% of recent days)
+ 
+  Today's volume = 880K
+ 
+──────────────────────────────────────────────────────────────
+Compare to threshold:
+ 
+  | Condition                    | Met?   | Decision        |
+  | :--------------------------- | :----- | :-------------- |
+  | Latest volume ≤ 40th pctile  | ✅ YES | Quiet → ALLOW   |
+  | Latest volume >  40th pctile | ❌ NO  | Loud  → BLOCK   |
+ 
+  880K ≤ 950K → quiet volume → entry ALLOWED ✅
+ 
+──────────────────────────────────────────────────────────────
+Final Volume summary:
+ 
+  | Metric              | Value  |
+  | :------------------ | :----- |
+  | Today's volume      |  880K  |
+  | 40th pctile (thresh)|  950K  |
+  | Volume quiet?       |  YES   |
+  | Decision            | ALLOW ✅|
+ 
+══════════════════════════════════════════════════════════════
+GOLDEN RULE
+ 
+  Volume ≤ 40th percentile → quiet, low conviction   → ALLOW
+  Volume >  40th percentile → loud, strong conviction → BLOCK
+ 
+══════════════════════════════════════════════════════════════
+ 
+ 
+═══════════════════════════════════════════════
+5. Weekly Trend Filter (WeeklyBull)            |
+═══════════════════════════════════════════════
+ 
+The weekly filter answers ONE question:
+    "Is the big picture trend working with us or against us?"
+ 
+It tells you: only trade mean reversion WITH the macro trend.
+              Don't buy in a downtrend. Don't sell in an uptrend.
+ 
+ANALOGY:
+  Don't swim against the current. Trade WITH the big trend.
+  A BUY signal in a falling market is a falling knife.
+  A SELL signal in a rising market fights the tide.
+ 
+══════════════════════════════════════════════════════════════
+ 
+FORMULA:
+══════════════════════════════════════════════════════════════
+ 
+  WeeklySMA  = average of last 50 closing prices
+ 
+  WeeklyBull = (Price_today > WeeklySMA)
+                    ↑
+              True  → long-term uptrend  → BUY allowed
+              False → long-term downtrend → SELL allowed
+ 
+══════════════════════════════════════════════════════════════
+ 
+WORKFLOW (based on your settings):
+Settings in your strategy:
+  weekly_window   = 50 days
+  use_weekly_filter = True
+ 
+──────────────────────────────────────────────────────────────
+Worked example
+ 
+  WeeklySMA (50-day avg) = $102.00
+  Price today            = $107.50
+ 
+  WeeklyBull = (107.50 > 102.00) = True  → long-term UPTREND
+ 
+──────────────────────────────────────────────────────────────
+How it gates BUY and SELL:
+ 
+  | Signal   | WeeklyBull | Decision              |
+  | :------- | :--------- | :-------------------- |
+  | BUY      | True       | ✅ ALLOW  (buying in uptrend)   |
+  | BUY      | False      | ❌ BLOCK  (buying in downtrend) |
+  | SELL     | False      | ✅ ALLOW  (selling in downtrend)|
+  | SELL     | True       | ❌ BLOCK  (selling in uptrend)  |
+ 
+──────────────────────────────────────────────────────────────
+Final Weekly Filter summary:
+ 
+  | Metric      | Value    |
+  | :---------- | :------- |
+  | WeeklySMA   | $102.00  |
+  | Price today | $107.50  |
+  | WeeklyBull  | True     |
+  | BUY allowed | YES ✅   |
+  | SELL allowed| NO ❌    |
+ 
+══════════════════════════════════════════════════════════════
+GOLDEN RULE
+ 
+  WeeklyBull = True  → uptrend  → BUY  ALLOWED,  SELL BLOCKED
+  WeeklyBull = False → downtrend → SELL ALLOWED,  BUY  BLOCKED
+ 
+  Always trade the oversold dip WITH the bigger trend.
+ 
+══════════════════════════════════════════════════════════════
+ 
+ 
+═══════════════════════════════════════════════
+6. ATR — Average True Range                    |
+═══════════════════════════════════════════════
+ 
+ATR answers ONE question:
+    "How many dollars does this stock move per day on average?"
+ 
+It does NOT generate a BUY or SELL vote.
+It is used ONLY to size the stop-loss and take-profit after a signal fires.
+ 
+  stop_loss   = entry_price − (ATR × 1.5)   ← for a BUY
+  take_profit = entry_price + (ATR × 3.0)   ← for a BUY
+ 
+  stop_loss   = entry_price + (ATR × 1.5)   ← for a SELL
+  take_profit = entry_price − (ATR × 3.0)   ← for a SELL
+ 
+  2:1 reward-to-risk ratio baked in (TP = 2 × SL distance)
+ 
+══════════════════════════════════════════════════════════════
+ 
+FORMULA:
+══════════════════════════════════════════════════════════════
+ 
+  Same True Range as ADX, but no directional component.
+  ATR just smooths TR values — it only cares about SIZE, not direction.
+ 
+  TR  = max(High−Low, |High−PrevClose|, |Low−PrevClose|)
+  ATR = ewm(TR, alpha=1/14)
+ 
+══════════════════════════════════════════════════════════════
+ 
+WORKFLOW (based on your settings):
+Settings in your strategy:
+  atr_period     = 14 days
+  stop_atr_mult  = 1.5
+  tp_atr_mult    = 3.0
+ 
+──────────────────────────────────────────────────────────────
+Worked example — BUY scenario
+ 
+  Entry price = $95.00
+  ATR         = $2.40  (stock moves ~$2.40/day on average)
+ 
+  stop_loss   = 95.00 − (1.5 × 2.40) = 95.00 − 3.60 = $91.40
+  take_profit = 95.00 + (3.0 × 2.40) = 95.00 + 7.20 = $102.20
+ 
+──────────────────────────────────────────────────────────────
+Visualize it:
+ 
+  take_profit ─────────────────────── $102.20  (+$7.20)
+  entry price ─────────────────────── $ 95.00  ← BUY here
+  stop_loss   ─────────────────────── $ 91.40  (−$3.60)
+ 
+  Risk  = $3.60 per share
+  Reward = $7.20 per share
+  Ratio  = 2:1 reward to risk ✅
+ 
+──────────────────────────────────────────────────────────────
+Final ATR summary:
+ 
+  | Metric       | Value    |
+  | :----------- | :------- |
+  | ATR          |   $2.40  |
+  | Entry price  |  $95.00  |
+  | Stop loss    |  $91.40  |
+  | Take profit  | $102.20  |
+  | R:R ratio    |    2 : 1 |
+ 
+══════════════════════════════════════════════════════════════
+GOLDEN RULE
+ 
+  ATR tells you HOW MUCH the stock moves.
+  Bigger ATR → wider stop + bigger target (high volatility stock).
+  Smaller ATR → tighter stop + smaller target (calm stock).
+  The 2:1 reward-to-risk ratio is always maintained.
+ 
+══════════════════════════════════════════════════════════════
+ 
+ 
+🚦 The Complete Decision Flow
+──────────────────────────────────────────────────────────────
+ 
+                    START
+                      │
+                      ▼
+         ┌────────────────────────┐
+         │ Is Z-Score crossing 0? │ ← YES → EXIT (close position)
+         └────────────────────────┘         action=HOLD, signal=BB_MEAN_REVERT
+                      │ No
+                      ▼
+         ┌────────────────────────┐
+         │ Is ADX ≥ 25?           │ ← YES → HOLD (trending market, blocked)
+         └────────────────────────┘
+                      │ No
+                      ▼
+         ┌────────────────────────┐
+         │ Is BandWidth expanding │
+         │ ≥ 3% this bar?         │ ← YES → HOLD (breakout starting, blocked)
+         └────────────────────────┘
+                      │ No
+                      ▼
+         ┌────────────────────────┐
+         │ Is Volume above the    │
+         │ 40th percentile?       │ ← YES → HOLD (conviction move, blocked)
+         └────────────────────────┘
+                      │ No
+                      ▼
+         ┌────────────────────────┐
+         │ price ≤ Lower Band     │
+         │ AND Z ≤ −1.5           │ ← YES → check weekly filter
+         │ AND WeeklyBull = True? │         if True  → BUY ✅
+         └────────────────────────┘         if False → HOLD (blocked)
+                      │ No
+                      ▼
+         ┌────────────────────────┐
+         │ price ≥ Upper Band     │
+         │ AND Z ≥ +1.5           │ ← YES → check weekly filter
+         │ AND WeeklyBull = False?│         if False → SELL ✅
+         └────────────────────────┘         if True  → HOLD (blocked)
+                      │ No
+                      ▼
+               HOLD (BB_NEUTRAL, no signal)
+ 
+ 
+📋 Quick Reference Card
+──────────────────────────────────────────────────────────────
+ 
+  | Indicator     | BUY Signal         | SELL Signal         | Blocks Entry         |
+  | :------------ | :----------------- | :------------------ | :------------------- |
+  | Bollinger     | price ≤ Lower Band | price ≥ Upper Band  | —                    |
+  | Z-Score       | Z ≤ −1.5           | Z ≥ +1.5            | —                    |
+  | ADX           | —                  | —                   | ADX ≥ 25 (trending)  |
+  | BandWidth     | —                  | —                   | BW_Change ≥ 3%       |
+  | Volume        | —                  | —                   | above 40th pctile    |
+  | WeeklyBull    | must be True       | must be False       | wrong direction      |
+  | ATR           | sets stop/tp       | sets stop/tp        | —                    |
+ 
+ 
+Q: Why are there so many filters?
+A: Each filter prevents a specific type of loss.
+   ADX       → stops you losing to a trending market
+   BandWidth → stops you fighting a breakout
+   Volume    → stops you entering on a conviction move
+   Weekly    → stops you trading against the macro trend
+   Together they protect you from bad conditions.
+ 
+Q: Which indicator is the most important?
+A: Bollinger Bands + Z-Score are the CORE (they generate the actual signal).
+   All other indicators are GUARDS that block bad entries.
+ 
+Q: Can I disable the filters?
+A: Yes, each filter has a parameter:
+     require_volume    = False  → skip volume filter
+     use_weekly_filter = False  → skip weekly trend filter
+   But you'll lose money in the conditions they protect against.
+ 
+Q: What is the difference between HOLD and EXIT?
+A: HOLD  = no position, do nothing.
+   EXIT  = you ARE in a trade and it's time to close it.
+           (action=HOLD but signal_type=BB_MEAN_REVERT, reasoning starts with [EXIT])
+ 
+Q: Why does EXIT use action=HOLD instead of action=EXIT?
+A: The BaseStrategy validator only accepts BUY, SELL, or HOLD.
+   EXIT intent is encoded as HOLD + signal_type=BB_MEAN_REVERT so downstream
+   consumers can detect it by checking signal_type == "BB_MEAN_REVERT".
+ 
+Q: Why is the confidence cap 0.88 and not 1.0?
+A: Mean reversion is a probabilistic strategy. Even the strongest Z-Score
+   doesn't guarantee a reversal. The cap reflects that uncertainty.
+ 
+Q: Why 1.5 for the Z-Score threshold?
+A: 1.5 standard deviations is the sweet spot — extreme enough to have
+   a real edge, but not so rare that you get very few trades.
+ 
+Q: What happens if there is no Volume column in the data?
+A: The volume filter defaults to True (allow), so the strategy degrades
+   gracefully and still generates signals without volume data.

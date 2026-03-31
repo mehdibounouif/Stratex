@@ -672,7 +672,7 @@ class MeanReversionStrategy(BaseStrategy):
             stop_atr_mult = STOP_LOSS_ATR_MULT
             tp_atr_mult   = TP_ATR_MULT
 
-        # ── Guard — bw_expand_threshold ───────────────────────────────────
+        # ── Guard — bw_expand_threshold ────
         try:
             bw_expand_threshold = float(bw_expand_threshold)
             if bw_expand_threshold <= 0:
