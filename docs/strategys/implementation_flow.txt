@@ -1,0 +1,82 @@
+generate_signal(ticker, price_data) —
+ this is the one and only public method you call from outside.
+  It's the conductor. It doesn't compute anything itself
+   — it calls the right helpers in order and assembles the final signal dict.
+
+Step 1 → _validate_input(ticker, price_data)
+The first thing generate_signal does. It answers:
+ "is this data even usable?" It checks five things in order:
+is price_data None, is it actually a DataFrame,
+does it have the required columns (Close, High, Low), does it have at least 60 rows,
+and are there any NaN values in Close. If any check fails,
+ it calls _no_signal() and returns immediately — nothing else runs.
+
+Step 2 → _compute_indicators(price_data)
+Once the data passes validation, this is called.
+It takes the raw DataFrame and appends a bunch of new columns to it:
+the Bollinger Bands (SMA, STD, Upper, Lower), Z-Score, BandWidth, BandWidth_Change,
+and the weekly trend columns. Inside this method, it also calls two helper functions:
+
+_compute_adx(high, low, close) — measures trend strength on a 0–100 scale.
+ If ADX is above 25, the market is trending and mean reversion is risky.
+This function does a lot of work: it calculates True Range, then directional movement (+DM/-DM),
+then smooths everything using Wilder EWM to produce the final ADX value.
+_compute_atr(high, low, close) — measures volatility as a dollar amount 
+(how much does price move per day on average). It's simpler than ADX
+— same True Range logic, same Wilder smoothing, but no directional component.
+ The result is used to place stop-loss and take-profit levels.
+
+
+Step 3 → _build_base(ticker, price, diagnostics)
+After indicators are computed, this builds a "blank" signal dict with safe defaults:
+ action=HOLD, confidence=0.30, stop_loss=None, take_profit=None. 
+ Every code path that follows starts from this skeleton and only changes
+the fields it needs to. This prevents any path from accidentally returning an incomplete dict.
+
+Step 4 → _is_zero_cross(z_now, z_prev) (exit check — highest priority)
+Checks whether the Z-Score crossed zero between the previous bar and the current bar.
+If it did, the price has returned to its mean — the trade is done.
+This check runs before the filters and entry logic because an exit should 
+always fire regardless of current conditions. Returns a simple True/False.
+
+Step 5 → _volume_is_quiet(df) (inside the regime filters block)
+Called as part of the filter checks. It looks at the latest bar's volume
+and compares it to the 40th percentile of recent volume history.
+If volume is high (above the 40th percentile),
+the move has conviction — probably a breakout, not a reversion — so it blocks entry.
+If volume data isn't available, it defaults to True (allow) so the strategy degrades gracefully.
+
+Step 6 → _confidence(z) (inside the entry logic block)
+Only called when a BUY or SELL is about to be issued.
+ It maps the Z-Score magnitude to a confidence number between 0.55 and 0.88 using
+three tiers: flat floor at 0.55 when Z is weak, a linear ramp from 0.55 to 0.80
+as Z moves from entry threshold to strong threshold,
+and a small extra boost up to 0.88 when Z is beyond the strong threshold.
+
+_validate(signal) — called at every exit point
+This is the BaseStrategy method (inherited, not defined here).
+Every single return in generate_signal goes through _validate() first.
+It normalizes and sanity-checks the signal dict — clamps confidence,
+rounds prices, ensures required keys exist. Think of it as the output gatekeeper.
+
+_no_signal(ticker, reason) — the emergency exit
+Also inherited from BaseStrategy. Returns a minimal,
+safe signal dict with action=HOLD and signal_type=NO_SIGNAL.
+Called by _validate_input when something is wrong with the data,
+and also in the except block at the bottom of generate_signal if an
+unexpected error crashes the whole flow.
+
+
+💡 One-Sentence Summary for Each Indicator
+──────────────────────────────────────────────────────────────
+ 
+  | Indicator     | What it does in one sentence                                        |
+  | :------------ | :------------------------------------------------------------------ |
+  | Bollinger     | Shows when price has stretched too far from its average             |
+  | Z-Score       | Measures exactly HOW stretched the price is (in standard devs)      |
+  | ADX           | Tells you if the market is trending (bad) or ranging (good)         |
+  | BandWidth     | Detects if a big breakout is starting (bad for reversals)           |
+  | Volume        | Tells you if the move has strong conviction (bad) or is weak (good) |
+  | WeeklyBull    | Keeps you trading WITH the big trend, not against it                |
+  | ATR           | Sets stop-loss and take-profit based on current daily volatility     |
+ 
