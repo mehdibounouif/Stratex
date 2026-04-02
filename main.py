@@ -16,6 +16,30 @@ def run_live():
     log.info("Starting Live Trading Engine (Paper Trading Mode)")
     live_engine.start()
 
+def run_now(job: str):
+    """Run a single live-engine job immediately, skipping the scheduler and market-hours check."""
+    from system.live_engine import LiveEngine
+    engine = LiveEngine()
+
+    jobs = {
+        'pre_market':   engine.pre_market_job,
+        'market_open':  engine.market_open_job,
+        'mid_day':      engine.mid_day_job,
+        'market_close': engine.market_close_job,
+    }
+
+    if job not in jobs:
+        print(f"❌ Unknown job '{job}'. Choose from: {', '.join(jobs)}")
+        sys.exit(1)
+
+    # Monkey-patch market_calendar to always return True so the job
+    # doesn't early-exit with "not a trading day"
+    from system import market_calendar as _mc
+    _mc.market_calendar.is_trading_day = lambda: True
+
+    log.info(f"--now: running '{job}' immediately (market-hours check bypassed)")
+    jobs[job]()
+
 def run_backtest(ticker, start, end, strategy_name):
     from system.backtest_engine import BacktestEngine
     from strategies.strategy_researcher import strategy_engine
@@ -117,12 +141,17 @@ def main():
     parser.add_argument('--dashboard', action='store_true')
     parser.add_argument('--optimize', nargs=3, metavar=('TICKER', 'START', 'END'),
                         help='Walk-forward optimization. e.g. --optimize AAPL 2023-01-01 2024-12-31')
+    parser.add_argument('--now', metavar='JOB',
+                        help='Run one job immediately (no scheduler, no market-hours check). '
+                             'Jobs: pre_market, market_open, mid_day, market_close')
     
     args = parser.parse_args()
     
     try:
         if args.live:
             run_live()
+        elif args.now:
+            run_now(args.now)
         elif args.optimize:
             run_optimize(args.optimize[0], args.optimize[1], args.optimize[2], args.strategy)
         elif args.backtest:
@@ -151,3 +180,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

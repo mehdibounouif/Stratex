@@ -165,17 +165,16 @@ def _check_alpha_vantage_key() -> tuple:
     except Exception as e:
         return 'WARN', f"Could not read Alpha Vantage key: {e}"
 
-
 def _check_env_file() -> tuple:
-    """.env file should exist in the project root."""
-    if os.path.isfile('.env'):
-        return 'OK', ".env file found"
-    return 'WARN', (
+    """.env file or env vars should be configured."""
+    # Inside Docker, vars are injected directly — no .env file present
+    if os.path.isfile('.env') or os.environ.get('ALPACA_API_KEY') or os.environ.get('ALPHA_VANTAGE_API_KEY'):
+        return 'OK', "Environment configured"
+    return (
+        'WARN',
         ".env file not found in project root. "
-        "API keys and settings should be defined there. "
         "Copy .env.example to .env and fill in your values."
     )
-
 
 def _check_cache_freshness() -> tuple:
     """
