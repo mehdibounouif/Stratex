@@ -6,7 +6,6 @@ import argparse
 import sys
 import subprocess
 from logger import get_logger, setup_logging
-import uvicorn
 from config.trading_config import TradingConfig
 
 setup_logging()
@@ -80,6 +79,13 @@ def run_optimize(ticker, start, end, strategy_name):
     if results:
         filepath = opt.save_results(results)
         print(f"\n✅ Results saved to: {filepath}")
+
+        # Immediately apply the new consensus params to the live strategy singleton.
+        # This means you don't need to restart the system after optimizing.
+        from strategies.rsi_strategy import load_wfo_params, rsi_strategy
+        applied = load_wfo_params(rsi_strategy)
+        if applied:
+            print(f"\n🔄 Live strategy updated: {applied}")
     else:
         print("\n❌ Optimization failed. Check logs above.")
 
@@ -124,6 +130,13 @@ def main():
         elif args.dashboard:
             run_dashboard()
         elif args.api:
+            try:
+                import uvicorn
+            except ImportError:
+                print("❌ uvicorn not installed. Run: pip install uvicorn")
+                sys.exit(1)
+            log.info("Starting Stratex REST API on http://0.0.0.0:8000")
+            log.info("Docs available at: http://localhost:8000/docs")
             uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
         else:
             interactive_menu()

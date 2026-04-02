@@ -16,7 +16,7 @@ class StrategyResearcher:
         self.strategies = {
             'rsi_mean_reversion':  rsi_strategy,
             'momentum':            momentum_strategy,
-            #'mean_reversion':      mean_reversion_strategy,
+            'mean_reversion':      mean_reversion_strategy,
             #'pairs':               pairs_strategy,
             #'ml_signal':           ml_signal_strategy,
         }
