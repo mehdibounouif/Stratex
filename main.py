@@ -131,13 +131,19 @@ def main():
             run_dashboard()
         elif args.api:
             try:
+                import os
                 import uvicorn
             except ImportError:
                 print("❌ uvicorn not installed. Run: pip install uvicorn")
                 sys.exit(1)
             log.info("Starting Stratex REST API on http://0.0.0.0:8000")
             log.info("Docs available at: http://localhost:8000/docs")
-            uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=True)
+            uvicorn.run(
+                "api.main:app",
+                host=os.getenv("API_HOST", "0.0.0.0"),
+                port=int(os.getenv("API_PORT", 8000)),
+                reload=True
+            )
         else:
             interactive_menu()
     except KeyboardInterrupt:

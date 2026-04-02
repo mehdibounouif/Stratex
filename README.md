@@ -1,18 +1,43 @@
+<div align="center">
+
 # Stratex
 
-> **A production-grade quantitative trading system** — multi-strategy signal generation, institutional-level risk management, walk-forward optimization, backtesting engine, live paper trading via Alpaca, real-time Streamlit dashboard, and full Docker deployment. Built in Python, designed for serious algorithmic trading research and deployment.
+**Production-grade algorithmic trading platform**
+
+Multi-strategy signal generation · Institutional risk management · Walk-forward optimization · Live paper trading · REST API · Real-time dashboard
+
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=flat-square)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688?style=flat-square)](https://fastapi.tiangolo.com)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square)](https://docker.com)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+
+</div>
+
+---
+
+## Overview
+
+Stratex is a full-stack quantitative trading system built for serious algorithmic research and live execution. It combines four classical technical strategies with an optional AI signal layer, all routed through a strict institutional-grade risk engine before any trade is executed.
+
+Three core principles drive every design decision:
+
+- **Signal quality over quantity** — strategies must agree before a trade is taken; a confidence gate rejects weak signals below 55%
+- **Risk first** — no trade bypasses the 6-check risk gate; daily loss and max drawdown checks always fail closed and cannot be overridden
+- **Graceful degradation** — the system runs on `yfinance` alone; Alpaca, Alpha Vantage, and OpenAI are optional enhancements
+
+**Capital:** $100,000 · **Default strategy:** RSI Mean Reversion · **Watchlist:** AAPL, MSFT, NVDA, GOOGL, META, TSLA, AMZN, AMD, NFLX
 
 ---
 
 ## Table of Contents
 
-- [Overview](#overview)
 - [Architecture](#architecture)
 - [Features](#features)
 - [Strategies](#strategies)
 - [Walk-Forward Optimization](#walk-forward-optimization)
 - [Risk Management](#risk-management)
-- [Docker Deployment](#docker-deployment)
+- [REST API](#rest-api)
+- [Alert System](#alert-system)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
 - [Configuration](#configuration)
@@ -21,22 +46,9 @@
 - [Backtesting](#backtesting)
 - [Live Trading](#live-trading)
 - [Data Layer](#data-layer)
+- [Docker Deployment](#docker-deployment)
 - [Testing](#testing)
 - [Team](#team)
-
----
-
-## Overview
-
-Stratex is a full-stack algorithmic trading platform built for quantitative research and live execution. It combines classical technical strategies (RSI, Momentum, Bollinger Bands, Pairs Trading) with an optional AI signal layer powered by GPT, all routed through a strict risk gate before any trade is executed.
-
-The system is built around three core principles:
-
-- **Signal quality over quantity** — multiple strategies must agree before a trade is taken
-- **Risk first** — no trade bypasses the 6-check risk engine; two checks (daily loss, max drawdown) always fail closed
-- **Graceful degradation** — the system runs on `yfinance` alone; AI and fundamentals are optional enhancements
-
-**Initial capital:** $100,000 · **Default strategy:** RSI Mean Reversion · **Default watchlist:** AAPL, MSFT, NVDA, GOOGL, META, TSLA, AMZN, AMD, NFLX
 
 ---
 
@@ -44,21 +56,22 @@ The system is built around three core principles:
 
 ```
 main.py
-├── --live          → LiveEngine (APScheduler cron jobs)
-├── --backtest      → BacktestEngine (historical simulation)
+├── --live          → LiveEngine       (APScheduler cron jobs)
+├── --backtest      → BacktestEngine   (historical simulation)
 ├── --optimize      → WalkForwardOptimizer (parameter search)
 ├── --dashboard     → Streamlit dashboard
+├── --api           → FastAPI REST API (uvicorn)
 └── (default)       → Interactive CLI menu
 
 TradingSystem (system_architect.py)
-├── DataEngineer            → SQLite cache → yfinance
-├── StrategyResearcher      → RSI / Momentum / MeanReversion / Pairs
-├── SignalAggregator        → Conflict resolution, confidence scoring
-├── RiskManager             → 6-check gate (position, cash, sector, loss, drawdown)
-├── PositionSizer           → Fixed Fractional or Kelly Criterion
-├── TradeAudit              → JSONL audit trail
-├── WalkForwardOptimizer    → Rolling-window parameter optimization
-└── AlpacaGateway           → Paper / live order execution
+├── DataEngineer         → SQLite cache → yfinance
+├── StrategyResearcher   → RSI / Momentum / MeanReversion / Pairs
+├── SignalAggregator     → Conflict resolution, confidence scoring
+├── RiskManager          → 6-check gate
+├── PositionSizer        → Fixed Fractional or Kelly Criterion
+├── TradeAudit           → JSONL audit trail
+├── AlertManager         → Email + Telegram notifications
+└── AlpacaGateway        → Paper / live order execution
 ```
 
 **Daily execution flow:**
@@ -70,11 +83,13 @@ run_daily_analysis()
     ├── scan_watchlist()
     │     └── analyze_single_stock(ticker)
     │           ├── data_access.get_price_history()
-    │           ├── strategy_engine.analyze()          ← technical signal
-    │           ├── tradingagents.analyze()            ← AI signal (optional)
-    │           ├── signal_aggregator.combine()        ← merge & resolve
-    │           ├── risk_manager.approve_trade()       ← 6 checks
-    │           └── _execute_trade()                   ← position + audit
+    │           ├── strategy_engine.analyze()        ← all active strategies
+    │           ├── tradingagents.analyze()           ← AI signal (optional)
+    │           ├── signal_aggregator.combine()       ← merge & resolve conflicts
+    │           ├── confidence gate (< 55% → HOLD)
+    │           ├── risk_manager.approve_trade()      ← 6 checks
+    │           ├── _execute_trade()                  ← position + audit
+    │           └── alert_manager.send()              ← email + Telegram
     └── save_daily_report()
 ```
 
@@ -84,42 +99,44 @@ run_daily_analysis()
 
 | Feature | Description |
 |---|---|
-| **Multi-strategy signals** | RSI, Momentum, Bollinger Bands, Pairs Trading — all run in parallel |
-| **Walk-forward optimization** | Automatically finds best strategy parameters using rolling time windows |
+| **4 active strategies** | RSI, Momentum, Bollinger Bands, Pairs Trading — all run in parallel |
 | **Signal aggregation** | Majority-vote conflict resolution with confidence bonuses |
 | **6-check risk gate** | Position size, cash reserve, open positions, sector exposure, daily loss, max drawdown |
+| **Walk-forward optimization** | Finds best strategy parameters without overfitting; auto-loads consensus into live trading |
 | **Position sizing** | Fixed fractional (confidence-scaled) or Kelly Criterion (half-Kelly default) |
 | **Backtesting engine** | Realistic simulation with slippage (10bps) and commission ($0.005/share) |
 | **Live paper trading** | Alpaca API integration with APScheduler cron jobs |
+| **REST API** | FastAPI with API key authentication, interactive docs at `/docs` |
+| **Alert system** | Email (Gmail SMTP) + Telegram Bot — trade and risk events in real time |
 | **Smart data caching** | SQLite-first, yfinance fallback — strategies never wait for API calls |
 | **Full audit trail** | Every trade decision logged to JSONL with full reasoning and risk check results |
 | **Streamlit dashboard** | Real-time portfolio KPIs, strategy heatmap, order history, risk metrics |
-| **Docker deployment** | Full containerized deployment with docker-compose — runs anywhere |
 | **AI signal layer** | Optional GPT-4o-mini via TradingAgents (disabled by default) |
-| **Graceful degradation** | Runs without OpenAI or Alpha Vantage keys — yfinance is always the baseline |
+| **Docker deployment** | Full multi-service Compose setup (engine + dashboard + API) |
+| **CI pipeline** | GitHub Actions with pytest and 45% coverage threshold |
 
 ---
 
 ## Strategies
 
-All strategies inherit from `BaseStrategy` and follow a strict **signal contract**:
+All strategies inherit from `BaseStrategy` and return a standard signal contract:
 
 ```python
 {
     'ticker':        str,    # e.g. 'AAPL'
     'action':        str,    # 'BUY' | 'SELL' | 'HOLD'
     'confidence':    float,  # 0.0–1.0
-    'current_price': float,  # last close price
-    'reasoning':     str,    # human-readable explanation
+    'current_price': float,
+    'reasoning':     str,
     'signal_type':   str,    # e.g. 'RSI_OVERSOLD'
-    'strategy':      str,    # strategy name
+    'strategy':      str,
     'timestamp':     str,    # ISO-8601
 }
 ```
 
 ### RSI Mean Reversion (default)
 
-Uses Wilder's EWM smoothing (matching Bloomberg/TradingView standard).
+Uses Wilder's EWM smoothing — matching Bloomberg and TradingView standard RSI values.
 
 | Parameter | Default | Meaning |
 |---|---|---|
@@ -128,9 +145,11 @@ Uses Wilder's EWM smoothing (matching Bloomberg/TradingView standard).
 | `holding_days` | 5 | Max holding period |
 | `stop_loss` | 5% | Hard downside cutoff |
 
+> Parameters are automatically overridden by Walk-Forward Optimization consensus on startup.
+
 ### Momentum
 
-Three-indicator system — trades only when indicators agree.
+Three-indicator system — trades only when all indicators agree.
 
 | Indicator | Signal |
 |---|---|
@@ -138,7 +157,7 @@ Three-indicator system — trades only when indicators agree.
 | MA Crossover (10/30) | Golden cross → BUY / Death cross → SELL |
 | Price vs MA (50d) | Price above → uptrend / below → downtrend |
 
-Confidence scoring: all 3 agree → 85–95% · 2/3 agree → 65–75% · 1/3 → 50–60%
+Confidence: all 3 agree → 85–95% · 2/3 agree → 65–75% · 1/3 → 50–60%
 
 ### Mean Reversion (Bollinger Bands + Z-Score)
 
@@ -147,16 +166,13 @@ Production-grade strategy with trend filter.
 - **Entry:** Z-score > 1.5 std dev from mean + ADX < 25 (no strong trend) + volume confirmation (> 40th percentile)
 - **Strong entry:** Z-score > 2.2
 - **Stops:** ATR-based (1.5× ATR stop-loss, 3.0× ATR take-profit)
-- **ADX filter:** Prevents trading in strong trends where mean reversion fails
 - **Minimum data:** 60 bars required
 
 ### Pairs Trading (Statistical Arbitrage)
 
-Advanced cointegration-based strategy.
-
-- Engle-Granger cointegration test (rejects non-mean-reverting pairs)
-- Dynamic OLS hedge ratio (proper β instead of hardcoded 1:1)
-- Ornstein-Uhlenbeck half-life check (only trades pairs with realistic reversion speed)
+- Engle-Granger cointegration test — rejects non-mean-reverting pairs
+- Dynamic OLS hedge ratio — proper β instead of hardcoded 1:1
+- Ornstein-Uhlenbeck half-life check — only trades pairs with realistic reversion speed
 - ATR-based stop-loss and take-profit on every signal
 
 ### Adding a New Strategy
@@ -170,82 +186,49 @@ class MyStrategy(BaseStrategy):
         self.name = "My Strategy"
 
     def generate_signal(self, ticker, price_data) -> dict:
-        # ... your logic ...
+        # your logic
         return self._validate(signal)
 
 my_strategy = MyStrategy()
 
 # 2. Register in strategies/strategy_researcher.py
-self.strategies = {
-    'my_strategy': my_strategy,
-    # ...
-}
+self.strategies['my_strategy'] = my_strategy
 ```
+
+The system picks it up automatically — no changes needed in `system_architect.py`.
 
 ---
 
 ## Walk-Forward Optimization
 
-Walk-forward optimization (WFO) automatically finds the best strategy parameters without overfitting to historical data. Instead of testing one parameter set over the full date range, it uses rolling windows:
+Finds the best strategy parameters without overfitting to a single historical period.
+
+**How it works:**
 
 ```
-Window 1: Train Jan–Jun 2023 → find best params → Test Jul–Aug 2023
-Window 2: Train Mar–Aug 2023 → find best params → Test Sep–Oct 2023
-Window 3: Train May–Oct 2023 → find best params → Test Nov–Dec 2023
-...
+Full date range split into rolling windows
+        ↓
+Each window:
+    IN-SAMPLE  (6 months) → test all param combinations → pick best
+    OUT-OF-SAMPLE (2 months) → validate best params on unseen data
+        ↓
+Aggregate across all windows → consensus params
+        ↓
+Auto-loaded into live rsi_strategy on startup
 ```
 
-Each "train" phase searches all parameter combinations. The "test" phase validates them on unseen data. The final output shows which parameters actually hold up across real market conditions.
-
-### Running the Optimizer
+**Run it:**
 
 ```bash
-# Optimize RSI strategy on AAPL over 2 years
 python main.py --optimize AAPL 2023-01-01 2024-12-31
-
-# Use with a specific strategy
-python main.py --optimize NVDA 2022-01-01 2024-12-31 --strategy rsi_mean_reversion
 ```
 
-### Output
+Results are saved to `optimization_results/wfo_AAPL_<timestamp>.json` and immediately applied to the live strategy — no restart needed.
 
-Results are saved to `optimization_results/wfo_<TICKER>_<timestamp>.json` and printed to the console:
-
-```
-============================================================
-  WALK-FORWARD OPTIMIZATION RESULTS — AAPL
-============================================================
-  Metric used for ranking : sharpe_ratio
-  Total windows tested    : 6
-  Profitable windows      : 4 (66.7%)
-  Avg test return         : +2.14%
-  Avg test Sharpe ratio   : 0.812
-  Avg test max drawdown   : -3.21%
-------------------------------------------------------------
-  CONSENSUS (most-selected) parameters:
-    rsi_buy              = 20
-    rsi_sell             = 75
-    holding_days         = 5
-    stop_loss            = 0.05
-  Selected in 50% of windows
-============================================================
-```
-
-### Applying Results to Your Strategy
-
-Open `strategies/rsi_strategy.py` and update the singleton at the bottom:
+**Default parameter grid:**
 
 ```python
-# Update with your consensus_params from the optimizer output
-rsi_strategy = RSIStrategy(rsi_buy=20, rsi_sell=75, holding_days=5, stop_loss=0.05)
-```
-
-### Customizing the Parameter Grid
-
-Edit `DEFAULT_RSI_PARAM_GRID` in `system/walk_forward_optimizer.py`:
-
-```python
-DEFAULT_RSI_PARAM_GRID = {
+{
     "rsi_buy":      [20, 25, 30],
     "rsi_sell":     [70, 75, 80],
     "holding_days": [3, 5, 7],
@@ -253,272 +236,327 @@ DEFAULT_RSI_PARAM_GRID = {
 }
 ```
 
-> **Note:** 4 parameters × 3 values = 81 combinations per window. With 6 windows, expect 3–7 minutes to complete.
-
 ---
 
 ## Risk Management
 
-Every trade passes through a **6-check gate** before execution. Two checks always fail closed.
+Every trade passes through a **6-check gate**. Two checks always fail closed — they cannot be overridden by any configuration.
 
 | Check | Limit | Fail behavior |
 |---|---|---|
 | Position size | ≤ 15% of portfolio per stock | Fail open (configurable) |
 | Cash reserve | ≥ 10% cash at all times | Fail open |
 | Open positions | ≤ 15 simultaneous positions | Fail open |
-| Sector exposure | Per-sector caps (IT: 50%, Financials: 30%, etc.) | Fail open |
+| Sector exposure | Per-sector caps (IT: 50%, Financials: 30%, …) | Fail open |
 | Daily loss circuit | ≤ 3% daily loss | **Always fail closed** |
 | Max drawdown halt | ≤ 15% peak-to-trough | **Always fail closed** |
 
-Additional trade-level protection:
-- Default stop-loss: **5%** per trade
-- Default take-profit: **10%** per trade
+Additional per-trade protection:
+
+- Stop-loss: **5%** · Take-profit: **10%**
 - Minimum signal confidence: **55%**
-- Min Sharpe ratio threshold: **1.0**
-- Max portfolio beta: **1.5**
-- Max inter-asset correlation: **0.80**
+- Min Sharpe ratio: **1.0** · Max portfolio beta: **1.5** · Max correlation: **0.80**
 
 ### Position Sizing
 
-**Fixed Fractional (default):** Allocates a fixed percentage of portfolio per trade, scaled by signal confidence.
+**Fixed Fractional (default):** 5% of portfolio per trade, scaled by signal confidence.
 
-**Kelly Criterion:** Mathematically optimal sizing.
+**Kelly Criterion:**
+
 ```
-f* = (p × b - q) / b
+f* = (p × b − q) / b
 ```
-Default: **half-Kelly** (`KELLY_FRACTION = 0.5`). Capped at `MAX_POSITION_SIZE` (15%).
+
+Where `p` = win probability (confidence), `b` = win/loss ratio (take-profit / stop-loss).
+Default: **half-Kelly** (`KELLY_FRACTION = 0.5`). Capped at 15%.
 
 ---
 
-## Docker Deployment
+## REST API
 
-Stratex ships with a full Docker setup. The entire system runs in isolated containers that work identically on any machine or cloud server.
+Full FastAPI interface with interactive docs and API key authentication.
 
-### Services
+**Start the API:**
 
-| Service | Description | Port |
+```bash
+python main.py --api
+# Docs: http://localhost:8000/docs
+```
+
+**Authentication:**
+
+All endpoints except `/health` require an `X-API-Key` header.
+
+```bash
+# Generate a key
+python3 -c "import secrets; print(secrets.token_hex(32))"
+
+# Add to .env
+API_SECRET_KEY=your-generated-key
+
+# Use in requests
+curl -H "X-API-Key: your-key" http://localhost:8000/portfolio
+```
+
+**Endpoints:**
+
+| Method | Endpoint | Description | Auth |
+|---|---|---|---|
+| `GET` | `/health` | API status check | Public |
+| `GET` | `/portfolio` | Live positions and portfolio value | Required |
+| `GET` | `/portfolio/performance` | Full performance metrics | Required |
+| `GET` | `/signals/{ticker}` | Signal for a single ticker | Required |
+| `GET` | `/signals/scan` | Scan full watchlist | Required |
+| `POST` | `/backtest` | Run historical backtest | Required |
+| `GET` | `/audit` | Last N trade decisions | Required |
+
+**Backtest request body:**
+
+```json
+{
+    "ticker": "AAPL",
+    "start_date": "2024-01-01",
+    "end_date": "2024-12-31",
+    "strategy": "rsi_mean_reversion",
+    "initial_capital": 100000
+}
+```
+
+Available strategy values: `rsi_mean_reversion`, `momentum`, `mean_reversion`, `pairs`
+
+---
+
+## Alert System
+
+Real-time notifications for trade execution and risk events via **Email** and **Telegram**.
+
+| Event | Email | Telegram |
 |---|---|---|
-| `stratex_engine` | Live trading engine — runs 24/7 | — |
-| `stratex_dashboard` | Streamlit dashboard | 8501 |
-| `stratex_api` | REST API layer (coming soon) | 8000 |
+| BUY executed | ✅ | ✅ |
+| SELL executed | ✅ | ✅ |
+| Stop-loss triggered | ✅ | ✅ |
+| Circuit breaker fired | ✅ | ✅ |
+| Daily report saved | ✅ | — |
 
-All three share `./data`, `./logs`, and `./risk/reports` on your real disk via volume mounts.
+**Telegram setup (2 minutes):**
 
-### Quick Start
-
-```bash
-# 1. Copy environment template
-cp .env.example .env
-# Fill in your API keys in .env
-
-# 2. Create log files (required on first run — Fedora/SELinux note below)
-mkdir -p logs data risk/reports
-touch logs/system.log logs/trades.log logs/errors.log \
-      logs/risk.log logs/strategies.log logs/data_fetch.log
-
-# 3. Build the containers (~5 minutes first time)
-docker compose build
-
-# 4. Start all services
-docker compose up
-
-# Open your browser → http://localhost:8501
-```
-
-> **Fedora / SELinux users:** The volume mounts in `docker-compose.yml` use the `:z` flag (`./logs:/app/logs:z`) which tells SELinux to allow Docker access. This is already configured in the provided `docker-compose.yml`.
-
-### Common Commands
-
-```bash
-# Start in background
-docker compose up -d
-
-# View live logs
-docker compose logs -f
-
-# View one service only
-docker compose logs -f stratex_engine
-
-# Stop everything
-docker compose down
-
-# Rebuild after code changes
-docker compose build --no-cache && docker compose up
-
-# Open a shell inside a container (for debugging)
-docker exec -it stratex_engine bash
-```
-
-### Deploying to a Cloud Server
-
-```bash
-# On your VPS (DigitalOcean, AWS, Hetzner, etc.)
-curl -fsSL https://get.docker.com | sh
-
-git clone https://github.com/mehdibounouif/Quant_firm.git
-cd Quant_firm
-
-cp .env.example .env && nano .env
-
-mkdir -p logs data risk/reports
-touch logs/system.log logs/trades.log logs/errors.log \
-      logs/risk.log logs/strategies.log logs/data_fetch.log
-
-docker compose build
-docker compose up -d
-```
-
-Dashboard accessible at `http://YOUR_SERVER_IP:8501`.
+1. Message `@BotFather` on Telegram → `/newbot` → copy your token
+2. Message your bot once, then visit: `https://api.telegram.org/bot<TOKEN>/getUpdates`
+3. Copy the `id` field from the response — that is your `TELEGRAM_CHAT_ID`
+4. Add both to `.env` and run `python test_alert.py` to verify
 
 ---
 
 ## Project Structure
 
 ```
-Quant_firm/
+Stratex/
 │
-├── main.py                         # Entry point — CLI flags and interactive menu
-├── logger.py                       # Centralized logging
-├── requirements.txt                # Dependencies
-├── Dockerfile                      # Container build instructions
-├── docker-compose.yml              # Multi-service orchestration
-├── .env.example                    # Environment variable template
-├── .dockerignore                   # Files excluded from Docker image
+├── main.py                              # Entry point — all CLI flags
+├── logger.py                            # Centralized logging (6 log files)
+├── requirements.txt
+│
+├── api/
+│   └── main.py                          # FastAPI app — all REST endpoints
 │
 ├── config/
-│   ├── base_config.py              # Environment, API keys, paths
-│   ├── trading_config.py           # Capital, watchlist, strategy, sizing
-│   └── risk_config.py              # All hard risk limits
+│   ├── base_config.py                   # Environment, API keys, paths
+│   ├── trading_config.py                # Capital, watchlist, strategy, sizing
+│   └── risk_config.py                   # All hard risk limits
 │
 ├── data/
-│   ├── data_engineer.py            # Central data facade (cache-first)
-│   ├── database.py                 # SQLite — prices, fundamentals, news
-│   ├── stock_fetcher.py            # yfinance wrapper with retry
-│   ├── fundamental_fetcher.py      # Alpha Vantage fundamentals
-│   ├── news_fetcher.py             # Alpha Vantage news
-│   ├── retry.py                    # Retry decorator
-│   ├── health_check.py             # Data pipeline health monitoring
+│   ├── data_engineer.py                 # Central data facade (cache-first)
+│   ├── database.py                      # SQLite — prices, fundamentals, news
+│   ├── stock_fetcher.py                 # yfinance wrapper with retry
+│   ├── fundamental_fetcher.py           # Alpha Vantage fundamentals
+│   ├── news_fetcher.py                  # Alpha Vantage news
+│   ├── retry.py                         # Retry decorator
+│   ├── health_check.py                  # Data pipeline health monitoring
 │   └── pipelines/
-│       ├── data_cleaning.py        # OHLCV validation and cleaning
-│       ├── daily_update.py         # Daily price update pipeline
+│       ├── data_cleaning.py             # OHLCV validation and cleaning
+│       ├── daily_update.py
 │       └── weekly_update_fundamentals.py
 │
 ├── strategies/
-│   ├── base_strategy.py            # Abstract base + signal contract
-│   ├── strategy_researcher.py      # Strategy registry
-│   ├── rsi_strategy.py             # RSI Mean Reversion
-│   ├── momentum_strategy.py        # Multi-indicator Momentum
-│   ├── mean_reversion_strategy.py  # Bollinger Bands + Z-Score
-│   └── pairs_strategy.py           # Statistical Arbitrage
+│   ├── base_strategy.py                 # Abstract base + signal contract
+│   ├── strategy_researcher.py           # Strategy registry and engine
+│   ├── rsi_strategy.py                  # RSI Mean Reversion + WFO loader
+│   ├── momentum_strategy.py             # Multi-indicator Momentum
+│   ├── mean_reversion_strategy.py       # Bollinger Bands + Z-Score
+│   └── pairs_strategy.py                # Statistical Arbitrage
 │
 ├── system/
-│   ├── system_architect.py         # TradingSystem — central orchestrator
-│   ├── signal_aggregator.py        # Multi-signal conflict resolution
-│   ├── backtest_engine.py          # Historical simulation
-│   ├── walk_forward_optimizer.py   # Rolling-window parameter optimization ← NEW
-│   ├── live_engine.py              # APScheduler cron jobs
-│   ├── market_calendar.py          # NYSE trading day checker
-│   └── tradingagents_integration.py
+│   ├── system_architect.py              # TradingSystem — central orchestrator
+│   ├── signal_aggregator.py             # Multi-signal conflict resolution
+│   ├── backtest_engine.py               # Historical simulation
+│   ├── live_engine.py                   # APScheduler cron jobs
+│   ├── walk_forward_optimizer.py        # Parameter optimization
+│   ├── alert_manager.py                 # Email + Telegram alerts
+│   ├── market_calendar.py               # NYSE trading day checker
+│   └── tradingagents_integration.py     # Optional GPT signal layer
 │
 ├── risk/
-│   ├── risk_manager.py             # 6-check gate
-│   ├── position_sizer.py           # Fixed fractional and Kelly
-│   ├── trade_audit.py              # JSONL audit trail
+│   ├── risk_manager.py                  # 6-check gate
+│   ├── position_sizer.py                # Fixed fractional and Kelly
+│   ├── trade_audit.py                   # JSONL audit trail
 │   └── portfolio/
-│       ├── portfolio_tracker.py    # Positions, cash, P&L
-│       └── portfolio_calculator.py # Sharpe, beta, correlation, VaR
+│       ├── portfolio_tracker.py         # Positions, cash, P&L
+│       └── portfolio_calculator.py      # Sector, beta, Sharpe, VaR
 │
 ├── execution/
-│   ├── alpaca_gateway.py           # Alpaca broker gateway
-│   └── fill_models.py              # Slippage and commission simulation
+│   ├── alpaca_gateway.py                # Alpaca paper/live broker
+│   └── fill_models.py                   # Slippage and commission simulation
 │
 ├── dashboard/
-│   ├── app.py                      # Streamlit dashboard
-│   └── components.py               # KPI cards, charts, heatmaps
+│   ├── app.py                           # Streamlit dashboard
+│   └── components.py                    # KPI cards, charts, heatmaps
 │
+├── optimization_results/                # WFO output JSON files
+├── docs/                                # Research notes
+├── test/                                # pytest test suite (10 files)
 ├── scripts/
-│   └── start.sh                    # Docker container startup script ← NEW
-│
-├── optimization_results/           # WFO output JSON files (auto-generated) ← NEW
-├── logs/                           # Runtime log files
-├── docs/                           # Research notes
-├── test/                           # pytest test suite
-└── tradingagents/                  # Optional AI subproject
+│   └── start.sh                         # Docker startup script
+├── Dockerfile
+└── docker-compose.yml
 ```
 
 ---
 
 ## Getting Started
 
-### Local (Python)
+### Prerequisites
+
+- Python 3.10+
+- Git
+- Docker + Docker Compose (optional, for containerized deployment)
+
+### Installation
 
 ```bash
-git clone https://github.com/mehdibounouif/Quant_firm.git
-cd Quant_firm
+# Clone the repository
+git clone https://github.com/mehdibounouif/Stratex.git
+cd Stratex
 
+# Create and activate virtual environment
 python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+source venv/bin/activate        # Linux / macOS
+venv\Scripts\activate           # Windows
 
+# Install dependencies
 pip install -r requirements.txt
-
-cp .env.example .env            # fill in your keys
-python main.py
 ```
 
-### Docker
+### Environment Setup
 
-See [Docker Deployment](#docker-deployment) above.
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your credentials:
+
+```env
+# Required for live trading
+ALPACA_API_KEY=your_key
+ALPACA_SECRET_KEY=your_secret
+ALPACA_BASE_URL=https://paper-api.alpaca.markets
+
+# REST API authentication
+API_SECRET_KEY=your-generated-secret   # python3 -c "import secrets; print(secrets.token_hex(32))"
+
+# Alerts — Email
+ALERT_EMAIL_FROM=stratexalerts@gmail.com
+ALERT_EMAIL_TO=you@email.com
+ALERT_EMAIL_PASSWORD=your_gmail_app_password
+
+# Alerts — Telegram
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHAT_ID=your_chat_id
+
+# Optional
+OPENAI_API_KEY=sk-...          # AI signal layer
+ALPHA_VANTAGE_API_KEY=...      # Fundamentals and news
+```
+
+> The system runs fully without any optional keys. You will see warnings in the logs for missing keys — these are safe to ignore during development.
 
 ---
 
 ## Configuration
 
+All configuration lives in `/config`. No magic strings anywhere else in the codebase.
+
 ### `config/trading_config.py`
 
 ```python
-INITIAL_CAPITAL        = 100000
+INITIAL_CAPITAL        = 100000         # Starting portfolio value ($)
+DEFAULT_WATCHLIST      = ['AAPL', 'MSFT', 'NVDA', ...]
 DEFAULT_STRATEGY       = 'rsi_mean_reversion'
-MIN_SIGNAL_CONFIDENCE  = 0.55
-POSITION_SIZE_PCT      = 0.05
-POSITION_SIZING_METHOD = 'fixed_fractional'   # or 'kelly'
-KELLY_FRACTION         = 0.5
+MIN_SIGNAL_CONFIDENCE  = 0.55           # Below this → HOLD regardless
+POSITION_SIZE_PCT      = 0.05           # 5% per trade
+POSITION_SIZING_METHOD = 'fixed_fractional'  # or 'kelly'
+KELLY_FRACTION         = 0.5            # Half-Kelly (conservative)
 USE_PAPER_TRADING      = True
-USE_TRADING_AGENT      = False
+USE_TRADING_AGENT      = False          # Enable GPT signal layer
 ```
 
 ### `config/risk_config.py`
 
 ```python
-MAX_POSITION_SIZE         = 0.15
-MIN_CASH_RESERVE          = 0.10
-MAX_TOTAL_POSITIONS       = 15
-MAX_DAILY_LOSS            = 0.03
-MAX_DRAWDOWN_BEFORE_HALT  = 0.15
-DEFAULT_STOP_LOSS_PCT     = 0.05
-DEFAULT_TAKE_PROFIT_PCT   = 0.10
+MAX_POSITION_SIZE        = 0.15   # 15% max per stock
+MIN_CASH_RESERVE         = 0.10   # Keep 10% cash always
+MAX_TOTAL_POSITIONS      = 15
+MAX_DAILY_LOSS           = 0.03   # 3% daily loss circuit breaker
+MAX_DRAWDOWN_BEFORE_HALT = 0.15   # 15% max drawdown — halts all trading
+DEFAULT_STOP_LOSS_PCT    = 0.05
+DEFAULT_TAKE_PROFIT_PCT  = 0.10
 ```
 
 ---
 
 ## Usage
 
-```bash
-# Interactive menu
-python main.py
+### Interactive Mode
 
-# Backtest
+```bash
+python main.py
+```
+
+```
+--- Stratex Interactive ---
+1. Analyze Ticker
+2. Scan Watchlist
+3. Run Daily Analysis
+4. Exit
+```
+
+### Command Line Flags
+
+```bash
+# Live paper trading (scheduled cron jobs)
+python main.py --live
+
+# Backtest a strategy
 python main.py --backtest AAPL 2024-01-01 2024-12-31
 python main.py --backtest NVDA 2024-01-01 2024-12-31 --strategy momentum
 
 # Walk-forward optimization
 python main.py --optimize AAPL 2023-01-01 2024-12-31
 
-# Dashboard
+# Streamlit dashboard
 python main.py --dashboard
 
-# Live trading (paper mode)
-python main.py --live
+# REST API
+python main.py --api
 ```
+
+### Available Strategy Names
+
+| Flag value | Strategy |
+|---|---|
+| `rsi_mean_reversion` | RSI Mean Reversion (default) |
+| `momentum` | Multi-indicator Momentum |
+| `mean_reversion` | Bollinger Bands + Z-Score |
+| `pairs` | Statistical Arbitrage |
 
 ---
 
@@ -526,87 +564,197 @@ python main.py --live
 
 ```bash
 python main.py --dashboard
-# or via Docker:
-docker compose up dashboard
 # → http://localhost:8501
 ```
 
-- Portfolio KPIs — total value, cash, P&L, return %
-- Risk metrics — drawdown, daily loss, beta, Sharpe
-- Open positions with entry price, current price, P&L
-- Strategy heatmap across all tickers
-- Full order history with reasoning
-- CSV export for portfolio report and audit log
+- Portfolio KPIs — value, cash, realized/unrealized P&L, return %
+- Risk metrics — drawdown, daily loss, beta, Sharpe ratio
+- Open positions — entry price, current price, P&L per position
+- Strategy heatmap — signal history across all tickers and strategies
+- Order history — full trade log with reasoning
+- System health — data pipeline status and last update timestamps
+- Export buttons — portfolio report and audit log as CSV
+
+Auto-refreshes every 60 seconds during market hours.
 
 ---
 
 ## Backtesting
 
-```python
-from system.backtest_engine import BacktestEngine
-from strategies.rsi_strategy import rsi_strategy
-
-engine = BacktestEngine(rsi_strategy, initial_capital=100000)
-results = engine.run('AAPL', '2024-01-01', '2024-12-31')
+```bash
+python main.py --backtest AAPL 2024-01-01 2024-12-31
 ```
 
-Includes slippage (10bps), commission ($0.005/share), isolated portfolio, and fill simulation.
+```
+=============================================
+ BACKTEST: AAPL | RSI Mean Reversion
+=============================================
+Initial Capital:  $100,000.00
+Final Value:      $124,150.00
+Total Return:     24.15%
+Max Drawdown:     -8.42%
+Total Trades:     37
+Win Rate:         62.2%
+Sharpe Ratio:     1.43
+Commissions:      $12.45
+Slippage Cost:    $23.80
+=============================================
+```
+
+**Fill simulation defaults:**
+
+| Parameter | Default |
+|---|---|
+| Slippage model | Percentage-based |
+| Slippage value | 10 basis points |
+| Commission model | Per-share |
+| Commission rate | $0.005 / share |
 
 ---
 
 ## Live Trading
 
-> Always start with paper trading. Never use live capital without extensive backtesting and walk-forward validation.
+> **Always start with paper trading.** Never switch `USE_PAPER_TRADING` to `False` without extensive backtesting.
 
-**APScheduler jobs:**
+The live engine uses **APScheduler** with four scheduled jobs in NYSE timezone:
 
-| Time (NY) | Job |
-|---|---|
-| 09:00 AM | Pre-market cache warm-up |
-| 09:35 AM | Full watchlist scan + signal execution |
-| 12:30 PM | Stop-loss checks + price updates |
-| 03:55 PM | Daily report + performance summary |
+| Time (NY) | Job | Description |
+|---|---|---|
+| 09:00 AM | Pre-market | Warms data cache for all watchlist tickers |
+| 09:35 AM | Market open | Full watchlist scan → signals → risk gate → execution |
+| 12:30 PM | Mid-day | Checks stop-losses, updates position prices |
+| 03:55 PM | Market close | Saves daily report, logs performance summary |
 
-**Setup:** Create a free [Alpaca](https://alpaca.markets) account → generate paper trading keys → add to `.env` → `python main.py --live`
+Non-trading days are skipped automatically via `market_calendar.py`.
+
+**Alpaca paper trading setup:**
+
+1. Create a free account at [alpaca.markets](https://alpaca.markets)
+2. Generate paper trading API keys from the dashboard
+3. Add to `.env` with `ALPACA_BASE_URL=https://paper-api.alpaca.markets`
+4. Run `python main.py --live`
 
 ---
 
 ## Data Layer
 
-Cache-first architecture — strategies always receive clean, validated data with no API latency.
+Cache-first architecture — strategies always get clean data instantly.
+
+```
+Strategy requests data
+        ↓
+Check SQLite cache (< 1 day old?)
+   YES → return cached data
+   NO  → fetch from yfinance
+             ↓
+         Clean & validate (DataCleaner)
+             ↓
+         Save to SQLite cache
+             ↓
+         Return clean DataFrame
+```
+
+**Available methods:**
 
 ```python
 from data.data_engineer import data_access
 
-df    = data_access.get_price_history('AAPL', days=90)
-price = data_access.get_latest_price('AAPL')
-data  = data_access.get_multiple_stocks(['AAPL', 'MSFT'], days=60)
+df    = data_access.get_price_history('AAPL', days=90)   # OHLCV DataFrame
+price = data_access.get_latest_price('AAPL')              # float
+data  = data_access.get_multiple_stocks(['AAPL', 'MSFT']) # dict of DataFrames
+fund  = data_access.get_fundamentals('AAPL')              # requires Alpha Vantage
+news  = data_access.get_news('AAPL', days=7)              # requires Alpha Vantage
 ```
+
+**Cleaning pipeline** (`data/pipelines/data_cleaning.py`):
+- Removes duplicate rows and NaN OHLCV values
+- Validates price consistency (Open/High/Low/Close ranges)
+- Detects and removes outliers
+- Enforces minimum data requirements before strategies receive data
 
 ---
 
-## Testing
+## Docker Deployment
 
 ```bash
-pytest
-pytest --cov=. --cov-report=term-missing
-pytest test/test_risk_manger.py -v
+# Build all services
+docker compose build --no-cache
+
+# Start everything
+docker compose up -d
+
+# Individual services
+docker compose up stratex      # Trading engine (--live)
+docker compose up dashboard    # Streamlit on :8501
+docker compose up api          # REST API on :8000
+```
+
+**Services:**
+
+| Service | Port | Description |
+|---|---|---|
+| `stratex` | — | Live trading engine |
+| `dashboard` | 8501 | Streamlit dashboard |
+| `api` | 8000 | FastAPI REST API |
+
+**Volume mounts (data persists across container restarts):**
+
+```yaml
+./data                → /app/data
+./logs                → /app/logs
+./risk/reports        → /app/risk/reports
+./optimization_results → /app/optimization_results
 ```
 
 ---
 
 ## Logging
 
+Six separate log files under `logs/`:
+
 | File | Contents |
 |---|---|
-| `logs/system.log` | General activity |
-| `logs/trades.log` | Trade execution events |
+| `logs/system.log` | General application activity |
+| `logs/trades.log` | Trade execution events only |
 | `logs/errors.log` | Errors and exceptions |
 | `logs/data_fetch.log` | Data pipeline operations |
-| `logs/strategies.log` | Signal generation |
-| `logs/risk.log` | Risk check results |
+| `logs/strategies.log` | Strategy signal generation |
+| `logs/risk.log` | Risk check results per trade |
 
-Log rotation: 10MB per file, 5 backups kept.
+Rotation: 10MB per file, 5 backup files kept.
+
+---
+
+## Testing
+
+```bash
+# Run full test suite
+pytest test/ -v
+
+# With coverage report
+pytest test/ --cov=. --cov-report=term-missing
+
+# Single file
+pytest test/test_risk_manger.py -v
+```
+
+**Test coverage (10 test files):**
+
+| File | Coverage area |
+|---|---|
+| `test_data_cleaning.py` | DataCleaner edge cases |
+| `test_database.py` | SQLite CRUD and cache logic |
+| `test_momentum_strategy.py` | Signal generation across market conditions |
+| `test_portfolio_calculator.py` | Sharpe, beta, correlation, VaR |
+| `test_portfolio_tracker.py` | Position management and P&L |
+| `test_position_sizer.py` | Fixed fractional and Kelly math |
+| `test_risk_manger.py` | All 6 checks including circuit breakers |
+| `test_rsi_strategy.py` | RSI calculation and signal generation |
+| `test_mean_reversion_strategy.py` | Bollinger Bands + Z-Score signals |
+| `test_pairs_strategy.py` | Cointegration and pairs signal logic |
+| `test_trade_audit.py` | JSONL write/read and audit trail integrity |
+
+CI runs on every push to `main` and `dev` via GitHub Actions with a 45% coverage threshold.
 
 ---
 
