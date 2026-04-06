@@ -78,6 +78,7 @@ class Position:
             'quantity': float(self.quantity),
             'entry_price': float(self.entry_price),
             'current_price': float(self.current_price),
+            'market_value': float(self.quantity * self.current_price),
             'unrealized_pnl': float(self.unrealized_pnl),
             'entry_date': self.entry_date
         }

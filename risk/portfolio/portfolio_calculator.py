@@ -613,6 +613,9 @@ class PortfolioCalculator:
                         period_days = 252 if '1y' in period else int(''.join(filter(str.isdigit, period)) or 252)
                         df = self._data_access.get_price_history(t, days=period_days)
                         if df is not None and not df.empty and 'Close' in df.columns:
+                            # Ensure we have a DatetimeIndex so downstream logic can use .date()
+                            if 'Date' in df.columns:
+                                df = df.set_index('Date')
                             all_prices[t] = df['Close']
                         else:
                             missing_tickers.append(t)
@@ -1050,8 +1053,8 @@ class PortfolioCalculator:
                 "max_drawdown" : round(Decimal(str(max_dd)),     6),
                 "peak_value"   : round(Decimal(str(best_peak)),  2),
                 "trough_value" : round(Decimal(str(trough_val)), 2),
-                "peak_date": str(pd.Timestamp(best_peak_date).date()) if best_peak_date else None,
-                "trough_date"  : str(trough_date.date()),
+                "peak_date"    : str(pd.Timestamp(best_peak_date).date()) if best_peak_date else None,
+                "trough_date"  : str(pd.Timestamp(trough_date).date()) if trough_date else None,
             }
 
             logger.info(f"Max drawdown: {max_dd:.4%} | Peak: {best_peak:.2f} on {best_peak_date} | Trough: {trough_val:.2f} on {trough_date}")

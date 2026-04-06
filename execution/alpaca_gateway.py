@@ -19,6 +19,10 @@ class AlpacaGateway:
         self.secret_key = os.getenv('ALPACA_SECRET_KEY')
         self.base_url = os.getenv('ALPACA_BASE_URL', 'https://paper-api.alpaca.markets')
         
+        # Robustness fix: some users put /v2 in the URL, but the SDK adds it again if api_version='v2'
+        if self.base_url.endswith('/v2'):
+            self.base_url = self.base_url[:-3]
+        
         if not self.api_key or not self.secret_key:
             log.error("Alpaca API keys missing from environment.")
             self.api = None
