@@ -39,7 +39,6 @@ from risk.position_sizer import PositionSizer
 from risk.trade_audit import trade_audit
 from system.signal_aggregator import SignalAggregator
 from logger import  get_logger
-from system.alert_manager import alert_manager
 
 log = get_logger('system.system_architect')
 
@@ -84,6 +83,10 @@ class TradingSystem:
                 log.info("✅ TradingAgents integration loaded")
             except Exception as e:
                 log.warning(f"⚠️  TradingAgents unavailable: {e}. Running RSI-only.")
+
+        # Alpaca order manager — wires live order submission
+        from execution.alpaca_gateway import order_manager
+        self.order_manager = order_manager
 
         # Report output directory
         self.report_dir = 'risk/reports'
@@ -555,6 +558,17 @@ class TradingSystem:
 
         # ── Execute ────────────────────────────────────────────
         try:
+            # Submit live order to Alpaca first — if this fails, do not update tracker
+            order_result = self.order_manager.gateway.submit_order(
+                ticker=ticker,
+                action='BUY',
+                quantity=quantity
+            )
+            log.info(
+                f"   📤 Order submitted to Alpaca: BUY {quantity} × {ticker} "
+                f"(order_id={order_result.get('order_id')}, status={order_result.get('status')})"
+            )
+
             self.tracker.add_position(
                 ticker=ticker,
                 quantity=quantity,
@@ -568,18 +582,6 @@ class TradingSystem:
                 ticker=ticker, outcome='EXECUTED', action='BUY',
                 quantity=quantity, price=current_price,
                 signal=signal, approval=approval, sizing=sizing,
-            )
-            # ── Alert ──────────────────────────────────────────
-            alert_manager.send(
-                subject=f"BUY executed — {ticker}",
-                body=(
-                    f"Shares: {quantity}\n"
-                    f"Price: ${current_price:.2f}\n"
-                    f"Value: ${quantity * current_price:,.2f}\n"
-                    f"Confidence: {confidence:.0%}\n"
-                    f"Reason: {signal.get('reasoning', '')}"
-                ),
-                level="trade"
             )
             return {
                 'ticker':    ticker,
@@ -673,6 +675,17 @@ class TradingSystem:
 
         # ── Execute ────────────────────────────────────────────
         try:
+            # Submit live order to Alpaca first — if this fails, do not update tracker
+            order_result = self.order_manager.gateway.submit_order(
+                ticker=ticker,
+                action='SELL',
+                quantity=int(qty)
+            )
+            log.info(
+                f"   📤 Order submitted to Alpaca: SELL {qty:.0f} × {ticker} "
+                f"(order_id={order_result.get('order_id')}, status={order_result.get('status')})"
+            )
+
             result = self.tracker.remove_position(
                 ticker=ticker,
                 quantity=qty,
@@ -688,19 +701,6 @@ class TradingSystem:
                 quantity=int(qty), price=current_price,
                 signal=signal, approval=approval,
                 realized_pnl=pnl,
-            )
-            # ── Alert ──────────────────────────────────────────
-            pnl_emoji = "🟢" if pnl >= 0 else "🔴"
-            alert_manager.send(
-                subject=f"SELL executed — {ticker}",
-                body=(
-                    f"Shares: {qty:.0f}\n"
-                    f"Price: ${current_price:.2f}\n"
-                    f"Realized P&L: {pnl_emoji} ${pnl:+,.2f}\n"
-                    f"Confidence: {confidence:.0%}\n"
-                    f"Reason: {signal.get('reasoning', '')}"
-                ),
-                level="trade"
             )
             return {
                 'ticker':       ticker,
